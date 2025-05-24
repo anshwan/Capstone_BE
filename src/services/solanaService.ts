@@ -1,5 +1,11 @@
 import * as anchor from "@project-serum/anchor";
-import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
+import {
+  Connection,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import fs from "fs";
 import path from "path";
 import * as borsh from "borsh";
@@ -16,19 +22,25 @@ console.log("📄 [IDL] accounts:", IDL.accounts.map((a: any) => a.name));
 // ✅ Anchor Connection (provider 없이 사용)
 const connection = new Connection("https://api.devnet.solana.com", "processed");
 
-// ✅ Borsh 스키마 정의
+// ✅ Borsh 클래스 정의
 class InitializeArgs {
   s3_key: string;
   royalty_bps: number;
   is_derivative: number;
-  constructor(fields: { s3_key: string; royalty_bps: number; is_derivative: number }) {
+
+  constructor(fields: {
+    s3_key: string;
+    royalty_bps: number;
+    is_derivative: number;
+  }) {
     this.s3_key = fields.s3_key;
     this.royalty_bps = fields.royalty_bps;
     this.is_derivative = fields.is_derivative;
   }
 }
 
-const schema = new Map([
+// ✅ Borsh 스키마 정의 (타입 단언으로 해결)
+const schema: borsh.Schema = new Map([
   [
     InitializeArgs,
     {
@@ -36,19 +48,14 @@ const schema = new Map([
       fields: [
         ["s3_key", "string"],
         ["royalty_bps", "u16"],
-        ["is_derivative", "u8"]
-      ]
-    }
-  ]
+        ["is_derivative", "u8"],
+      ],
+    },
+  ],
 ]);
 
 /**
  * 트랜잭션 생성 함수
- * @param userWalletAddress 사용자 지갑 주소 (Base58)
- * @param s3Key S3에 업로드된 모델 폴더 경로
- * @param royalty 로열티 BPS (예: 100 = 1%)
- * @param is_derivative 2차 창작 허용 여부
- * @returns base64로 직렬화된 트랜잭션 문자열
  */
 export const createInitializeTx = async (
   userWalletAddress: string,
@@ -56,28 +63,40 @@ export const createInitializeTx = async (
   royalty: number,
   is_derivative: boolean
 ): Promise<string> => {
-  console.log("🛠️ [createInitializeTx] 입력값:", { userWalletAddress, s3Key, royalty, is_derivative });
+  console.log("🛠️ [createInitializeTx] 입력값:", {
+    userWalletAddress,
+    s3Key,
+    royalty,
+    is_derivative,
+  });
 
   try {
     const userPubkey = new PublicKey(userWalletAddress);
 
     // ✅ PDA 생성
     const [modelPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("model", "utf-8"), userPubkey.toBuffer(), Buffer.from(s3Key, "utf-8")],
+      [
+        Buffer.from("model", "utf-8"),
+        userPubkey.toBuffer(),
+        Buffer.from(s3Key, "utf-8"),
+      ],
       PROGRAM_ID
     );
 
     console.log("🔑 [PDA] modelPda:", modelPda.toBase58());
 
     // ✅ discriminator 추출
-    const discriminator = Buffer.from(IDL.instructions.find((i: any) => i.name === "initialize").discriminator);
+    const discriminator = Buffer.from(
+      IDL.instructions.find((i: any) => i.name === "initialize").discriminator
+    );
 
-    // ✅ 인자 수동 직렬화 (Borsh)
+    // ✅ Borsh 직렬화
     const args = new InitializeArgs({
       s3_key: s3Key,
       royalty_bps: royalty,
       is_derivative: is_derivative ? 1 : 0,
     });
+
     const serializedArgs = borsh.serialize(schema, args);
     const data = Buffer.concat([discriminator, Buffer.from(serializedArgs)]);
 
@@ -101,10 +120,14 @@ export const createInitializeTx = async (
       recentBlockhash: blockhash,
     }).add(ix);
 
-    const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
-    const base64Tx = serialized.toString("base64");
+    const serialized = tx.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    });
 
+    const base64Tx = serialized.toString("base64");
     console.log("📦 [SerializedTx] base64 길이:", base64Tx.length);
+
     return base64Tx;
   } catch (err) {
     console.error("❌ 트랜잭션 생성 실패:", err);
