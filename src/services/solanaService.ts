@@ -39,20 +39,16 @@ class InitializeArgs {
   }
 }
 
-// ✅ Borsh 스키마 정의 (타입 단언으로 해결)
-const schema: borsh.Schema = new Map([
-  [
-    InitializeArgs,
-    {
-      kind: "struct",
-      fields: [
-        ["s3_key", "string"],
-        ["royalty_bps", "u16"],
-        ["is_derivative", "u8"],
-      ],
-    },
+// ✅ Borsh 스키마 정의 (타입 단언 방식)
+const schema = new Map() as borsh.Schema;
+schema.set(InitializeArgs, {
+  kind: "struct",
+  fields: [
+    ["s3_key", "string"],
+    ["royalty_bps", "u16"],
+    ["is_derivative", "u8"],
   ],
-]);
+});
 
 /**
  * 트랜잭션 생성 함수
