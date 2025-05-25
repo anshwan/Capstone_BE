@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import jwt from "jsonwebtoken";
 import { PublicKey } from "@solana/web3.js";
 import nacl from "tweetnacl";
-import { PrismaClient } from "../generated/prisma"; 
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 

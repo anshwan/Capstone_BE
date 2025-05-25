@@ -3,7 +3,7 @@ import { Request, Response } from "express";
 import { uploadToS3 } from "../services/s3Service";
 import { createInitializeTx } from "../services/solanaService";
 import { AuthRequest } from "../middlewares/authMiddleware";
-import { PrismaClient } from "../generated/prisma";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -146,6 +146,7 @@ export const getOwnedModels = async (req: AuthRequest, res: Response): Promise<v
   const wallet = req.user?.wallet;
   if (!wallet) {
     res.status(401).json({ message: "지갑 인증이 필요합니다." });
+    return;
   }
 
   const user = await prisma.user.findUnique({
@@ -154,17 +155,18 @@ export const getOwnedModels = async (req: AuthRequest, res: Response): Promise<v
 
   if (!user) {
     res.status(404).json({ message: "사용자를 찾을 수 없습니다." });
+    return;
   }
 
   const licenses = await prisma.license.findMany({
-    where: { userId: user?.id },
+    where: { userId: user.id },
     include: { model: true },
   });
 
-  const models = licenses.map((l) => ({
+  const models = licenses.map((l: { model: { id: number; model_name: string } }) => ({
     id: l.model.id,
     model_name: l.model.model_name,
   }));
 
-  res.json(models);
+  res.status(200).json(models);
 };
