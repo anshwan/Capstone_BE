@@ -79,7 +79,7 @@ export const verifySignature = async (req: Request, res: Response): Promise<void
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: true,
-      sameSite: "strict",
+      sameSite: "none",
       maxAge: 24 * 60 * 60 * 1000, // 1일
     });
 
