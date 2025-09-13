@@ -1,3 +1,4 @@
+// com/example/capstone/config/SecurityConfig.java
 package com.example.capstone.config;
 
 import com.example.capstone.auth.jwt.JwtAuthFilter;
@@ -17,7 +18,8 @@ public class SecurityConfig {
     private final GoogleSuccessHandler googleSuccessHandler;
 
     public SecurityConfig(JwtAuthFilter jwtAuthFilter, GoogleSuccessHandler googleSuccessHandler) {
-        this.jwtAuthFilter = jwtAuthFilter; this.googleSuccessHandler = googleSuccessHandler;
+        this.jwtAuthFilter = jwtAuthFilter;
+        this.googleSuccessHandler = googleSuccessHandler;
     }
 
     @Bean
@@ -26,14 +28,15 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/health", "/public/**").permitAll()
-                        .requestMatchers("/oauth2/**", "/login/**").permitAll()
+                        .requestMatchers("/", "/index.html", "/health", "/static/**").permitAll()
+                        .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .anyRequest().authenticated()
                 )
+
                 .oauth2Login(oauth -> oauth
-                        .loginPage("/login")
                         .successHandler(googleSuccessHandler)
                 )
+                .logout(logout -> logout.logoutUrl("/logout").logoutSuccessUrl("/"))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

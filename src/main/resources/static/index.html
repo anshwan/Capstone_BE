@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8"/>
+    <title>홈 - 로그인 테스트</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 40px;}
+        .wrap{max-width:720px;margin:0 auto}
+        .card{border:1px solid #eee;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+        button{padding:10px 14px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer}
+        .primary{background:#0b57d0;color:#fff;border:none}
+        pre{background:#0b1020;color:#d8e0ff;padding:12px;border-radius:8px;overflow:auto}
+        img{width:42px;height:42px;border-radius:50%;vertical-align:middle;object-fit:cover}
+        code{background:#f6f8fa;padding:2px 6px;border-radius:6px}
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <h2>Google OAuth + JWT 간단 테스트</h2>
+    <div class="card">
+        <p id="status">로그아웃 상태 ❌</p>
+        <p>
+            <button class="primary" id="btnLogin">Google 로그인</button>
+            <button id="btnMe">/me 호출</button>
+            <button id="btnLogout">로그아웃(토큰삭제)</button>
+        </p>
+        <h3>응답</h3>
+        <pre id="output">(여기에 응답이 표시됩니다)</pre>
+    </div>
+</div>
+
+<script>
+    const out = (x)=>document.getElementById('output').textContent =
+      typeof x==='string'? x : JSON.stringify(x,null,2);
+
+    const getToken = ()=> localStorage.getItem('accessToken') || '';
+    const setToken = t => { if(t) localStorage.setItem('accessToken', t); updateStatus(); }
+    const setUser = u => localStorage.setItem('user', JSON.stringify(u||{}));
+    const getUser = ()=> JSON.parse(localStorage.getItem('user')||'{}');
+    const clearAll = ()=>{ localStorage.removeItem('accessToken'); localStorage.removeItem('user'); updateStatus(); }
+
+    function updateStatus(){
+      const t = getToken(), u = getUser();
+      const el = document.getElementById('status');
+      if(t){
+        el.innerHTML = `로그인 상태 ✅ <img src="${u.pictureUrl||''}" alt="">
+          <strong>${u.name||''}</strong> (${u.email||''})
+          <br/>토큰: <code>${t.slice(0,20)}...${t.slice(-8)}</code>`;
+      } else {
+        el.textContent = '로그아웃 상태 ❌';
+      }
+    }
+
+    // 팝업으로 /oauth2/authorization/google 열고, 콜백이 우리 출처로 돌아오면 JSON을 읽어 토큰/유저 저장
+    function login(){
+      const popup = window.open('/oauth2/authorization/google','oauth2','width=520,height=720');
+      if(!popup){ out('팝업 차단됨. 허용 후 다시 시도.'); return; }
+      const timer = setInterval(()=>{
+        try{
+          if(popup.closed){ clearInterval(timer); return; }
+          const same = popup.location.origin === window.location.origin;
+          const isCb = popup.location.pathname.startsWith('/login/oauth2/code/');
+          if(same && isCb){
+            const txt = popup.document.body.innerText || popup.document.body.textContent || '';
+            const data = JSON.parse(txt);
+            if(data && data.accessToken){
+              setToken(data.accessToken);
+              setUser(data.user || {});
+              out(data);
+            } else {
+              out('응답에 accessToken이 없음:\n'+txt);
+            }
+            popup.close(); clearInterval(timer);
+          }
+        }catch(e){ /* 구글 도메인에 있을 땐 교차출처로 접근 불가. 무시하고 대기 */ }
+      }, 200);
+    }
+
+    async function callMe(){
+      const t = getToken();
+      if(!t){ out('토큰 없음. 먼저 로그인하세요.'); return; }
+      const res = await fetch('/me', { headers: {Authorization: 'Bearer '+t} });
+      out(await res.json());
+    }
+
+    function logout(){
+      // JWT는 서버 세션이 없으므로 테스트에선 로컬 토큰만 삭제하면 충분
+      clearAll();
+      out('클라이언트 토큰 삭제 완료');
+    }
+
+    document.getElementById('btnLogin').onclick = login;
+    document.getElementById('btnMe').onclick = callMe;
+    document.getElementById('btnLogout').onclick = logout;
+
+    updateStatus();
+    if(getToken()) callMe(); // 자동 확인(선택)
+</script>
+</body>
+</html>
