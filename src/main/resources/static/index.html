@@ -2,37 +2,129 @@
 <html lang="ko">
 <head>
     <meta charset="utf-8"/>
-    <title>홈 - 로그인 테스트</title>
+    <title>홈 - 로그인 & 모델 등록 테스트</title>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <style>
         body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 40px;}
-        .wrap{max-width:720px;margin:0 auto}
+        .wrap{max-width:920px;margin:0 auto}
+        .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
         .card{border:1px solid #eee;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
         button{padding:10px 14px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer}
         .primary{background:#0b57d0;color:#fff;border:none}
         pre{background:#0b1020;color:#d8e0ff;padding:12px;border-radius:8px;overflow:auto}
         img{width:42px;height:42px;border-radius:50%;vertical-align:middle;object-fit:cover}
         code{background:#f6f8fa;padding:2px 6px;border-radius:6px}
+        label{display:block;font-size:12px;color:#555;margin:10px 0 6px}
+        input,textarea,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px}
+        textarea{min-height:88px}
+        .hint{font-size:12px;color:#777}
+        .hide{display:none}
     </style>
 </head>
 <body>
 <div class="wrap">
-    <h2>Google OAuth + JWT 간단 테스트</h2>
-    <div class="card">
-        <p id="status">로그아웃 상태 ❌</p>
-        <p>
-            <button class="primary" id="btnLogin">Google 로그인</button>
-            <button id="btnMe">/me 호출</button>
-            <button id="btnLogout">로그아웃(토큰삭제)</button>
-        </p>
-        <h3>응답</h3>
-        <pre id="output">(여기에 응답이 표시됩니다)</pre>
+    <h2>Google OAuth + JWT &rarr; 모델 등록 테스트</h2>
+
+    <div class="grid">
+        <!-- 로그인 카드 -->
+        <div class="card">
+            <h3>1) 로그인</h3>
+            <p id="status">로그아웃 상태 ❌</p>
+            <p>
+                <button class="primary" id="btnLogin">Google 로그인</button>
+                <button id="btnMe">/me 호출</button>
+                <button id="btnLogout">로그아웃(토큰삭제)</button>
+            </p>
+            <h4>응답</h4>
+            <pre id="output">(여기에 응답이 표시됩니다)</pre>
+        </div>
+
+        <!-- 모델 등록 카드 -->
+        <div class="card hide" id="modelCard">
+            <h3>2) 모델 등록</h3>
+            <form id="modelForm">
+                <label>모델 이름 *</label>
+                <input id="modelName" placeholder="예) My Great LLM" required>
+
+                <label>버전명 *</label>
+                <input id="versionName" placeholder="예) v1.0 또는 7B-instruct" required>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div>
+                        <label>모달리티 코드 *</label>
+                        <select id="modalityCode" required>
+                            <option value="">선택</option>
+                            <option>LLM</option>
+                            <option>VLM</option>
+                            <option value="IMAGE">IMAGE</option>
+                        </select>
+                        <div class="hint">사전에 modality 테이블에 시드 필요 (LLM/VLM/IMAGE)</div>
+                    </div>
+                    <div>
+                        <label>라이선스 코드 *</label>
+                        <select id="licenseCode" required>
+                            <option value="">선택</option>
+                            <option value="RESEARCH">RESEARCH</option>
+                            <option value="COMMERCIAL">COMMERCIAL</option>
+                            <option value="ONPREM">ONPREM</option>
+                            <option value="FT">FT</option>
+                        </select>
+                        <div class="hint">licenses 테이블 시드 필요</div>
+                    </div>
+                </div>
+
+                <label>모델 개요 (overview)</label>
+                <textarea id="overview" placeholder="대규모 한국어 요약에 최적화된 모델입니다."></textarea>
+
+                <label>릴리스 노트</label>
+                <textarea id="releaseNotes" placeholder="초기 릴리스: ..."></textarea>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+                    <div>
+                        <label>릴리스 날짜</label>
+                        <input id="releaseDate" type="date">
+                    </div>
+                    <div>
+                        <label>루트 CID</label>
+                        <input id="cidRoot" placeholder="bafy...">
+                    </div>
+                    <div>
+                        <label>체크섬 루트</label>
+                        <input id="checksumRoot" placeholder="sha256:...">
+                    </div>
+                </div>
+
+                <label>온체인 TX</label>
+                <input id="onchainTx" placeholder="Solana tx signature">
+
+                <label>storage(JSON)</label>
+                <textarea id="storage">{ "pinned": true }</textarea>
+
+                <label>metrics(JSON 배열)</label>
+                <textarea id="metrics">[ { "code":"MMLU", "value":85.2, "unit":"%" } ]</textarea>
+
+                <label>samples(JSON 배열)</label>
+                <textarea id="samples">[ { "input_type":"TEXT", "prompt":"안녕?", "output_text":"반가워!" } ]</textarea>
+
+                <label>lineage(JSON 배열)</label>
+                <textarea id="lineage">[]</textarea>
+
+                <p style="margin-top:14px">
+                    <button class="primary" type="submit">모델 등록</button>
+                </p>
+            </form>
+
+            <h4>등록 결과</h4>
+            <pre id="createOut">(등록 결과가 표시됩니다)</pre>
+        </div>
     </div>
 </div>
 
 <script>
-    const out = (x)=>document.getElementById('output').textContent =
-      typeof x==='string'? x : JSON.stringify(x,null,2);
+    // ---------- 공용 유틸 ----------
+    const $ = (id)=>document.getElementById(id);
+    const out = (x)=>$('output').textContent = typeof x==='string'? x : JSON.stringify(x,null,2);
+    const outCreate = (x)=>$('createOut').textContent = typeof x==='string'? x : JSON.stringify(x,null,2);
 
     const getToken = ()=> localStorage.getItem('accessToken') || '';
     const setToken = t => { if(t) localStorage.setItem('accessToken', t); updateStatus(); }
@@ -40,19 +132,24 @@
     const getUser = ()=> JSON.parse(localStorage.getItem('user')||'{}');
     const clearAll = ()=>{ localStorage.removeItem('accessToken'); localStorage.removeItem('user'); updateStatus(); }
 
+    function show(el){ el.classList.remove('hide'); }
+    function hide(el){ el.classList.add('hide'); }
+
     function updateStatus(){
       const t = getToken(), u = getUser();
-      const el = document.getElementById('status');
+      const el = $('status');
       if(t){
         el.innerHTML = `로그인 상태 ✅ <img src="${u.pictureUrl||''}" alt="">
           <strong>${u.name||''}</strong> (${u.email||''})
           <br/>토큰: <code>${t.slice(0,20)}...${t.slice(-8)}</code>`;
+        show($('modelCard'));
       } else {
         el.textContent = '로그아웃 상태 ❌';
+        hide($('modelCard'));
       }
     }
 
-    // 팝업으로 /oauth2/authorization/google 열고, 콜백이 우리 출처로 돌아오면 JSON을 읽어 토큰/유저 저장
+    // ---------- 로그인 ----------
     function login(){
       const popup = window.open('/oauth2/authorization/google','oauth2','width=520,height=720');
       if(!popup){ out('팝업 차단됨. 허용 후 다시 시도.'); return; }
@@ -68,12 +165,13 @@
               setToken(data.accessToken);
               setUser(data.user || {});
               out(data);
+              show($('modelCard'));         // ✅ 로그인 성공 시 모델 카드 표시
             } else {
               out('응답에 accessToken이 없음:\n'+txt);
             }
             popup.close(); clearInterval(timer);
           }
-        }catch(e){ /* 구글 도메인에 있을 땐 교차출처로 접근 불가. 무시하고 대기 */ }
+        }catch(e){ /* 구글 도메인일 땐 교차출처로 접근 불가. 무시하고 대기 */ }
       }, 200);
     }
 
@@ -85,17 +183,75 @@
     }
 
     function logout(){
-      // JWT는 서버 세션이 없으므로 테스트에선 로컬 토큰만 삭제하면 충분
       clearAll();
       out('클라이언트 토큰 삭제 완료');
     }
 
-    document.getElementById('btnLogin').onclick = login;
-    document.getElementById('btnMe').onclick = callMe;
-    document.getElementById('btnLogout').onclick = logout;
+    // ---------- 모델 등록 ----------
+    function safeParse(id){
+      const txt = $(id).value.trim();
+      if(!txt) return null;
+      try { return JSON.parse(txt); }
+      catch(e){ throw new Error(`${id} JSON 파싱 실패: ${e.message}`); }
+    }
 
+    async function submitModel(e){
+      e.preventDefault();
+      const t = getToken();
+      if(!t){ outCreate('토큰 없음. 먼저 로그인하세요.'); return; }
+
+      try{
+        const body = {
+          modelName:   $('modelName').value.trim(),
+          versionName: $('versionName').value.trim(),
+          modalityCode:$('modalityCode').value,
+          licenseCode: $('licenseCode').value,
+          overview:    $('overview').value,
+          releaseNotes:$('releaseNotes').value,
+          releaseDate: $('releaseDate').value || null,
+          cidRoot:     $('cidRoot').value || null,
+          checksumRoot:$('checksumRoot').value || null,
+          onchainTx:   $('onchainTx').value || null,
+          storage:     safeParse('storage'),
+          metrics:     safeParse('metrics'),
+          samples:     safeParse('samples'),
+          lineage:     safeParse('lineage')
+        };
+
+        if(!body.modelName || !body.versionName || !body.modalityCode || !body.licenseCode){
+          outCreate('필수값(모델 이름/버전/모달리티/라이선스)을 입력하세요.');
+          return;
+        }
+
+        const res = await fetch('/api/models', {
+          method: 'POST',
+          headers: {
+            'Content-Type':'application/json',
+            Authorization: 'Bearer '+t
+          },
+          body: JSON.stringify(body)
+        });
+
+        const data = await res.json().catch(()=>({}));
+        if(!res.ok){
+          outCreate({error: true, status: res.status, data});
+        }else{
+          outCreate(data);
+        }
+      }catch(err){
+        outCreate(String(err));
+      }
+    }
+
+    // ---------- 바인딩 ----------
+    $('btnLogin').onclick = login;
+    $('btnMe').onclick = callMe;
+    $('btnLogout').onclick = logout;
+    $('modelForm').addEventListener('submit', submitModel);
+
+    // 초기 상태 반영
     updateStatus();
-    if(getToken()) callMe(); // 자동 확인(선택)
+    if(getToken()) callMe();
 </script>
 </body>
 </html>
