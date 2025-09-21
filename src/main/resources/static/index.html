@@ -23,7 +23,7 @@
 </head>
 <body>
 <div class="wrap">
-    <h2>Google OAuth + JWT &rarr; 모델 등록 테스트</h2>
+    <h2>Google OAuth + JWT → 모델 등록 테스트</h2>
 
     <div class="grid">
         <!-- 로그인 카드 -->
@@ -58,7 +58,7 @@
                             <option>VLM</option>
                             <option value="IMAGE">IMAGE</option>
                         </select>
-                        <div class="hint">사전에 modality 테이블에 시드 필요 (LLM/VLM/IMAGE)</div>
+                        <div class="hint">사전에 modality 테이블에 시드 필요</div>
                     </div>
                     <div>
                         <label>라이선스 코드 *</label>
@@ -69,15 +69,14 @@
                             <option value="ONPREM">ONPREM</option>
                             <option value="FT">FT</option>
                         </select>
-                        <div class="hint">licenses 테이블 시드 필요</div>
                     </div>
                 </div>
 
-                <label>모델 개요 (overview)</label>
-                <textarea id="overview" placeholder="대규모 한국어 요약에 최적화된 모델입니다."></textarea>
+                <label>모델 개요</label>
+                <textarea id="overview"></textarea>
 
                 <label>릴리스 노트</label>
-                <textarea id="releaseNotes" placeholder="초기 릴리스: ..."></textarea>
+                <textarea id="releaseNotes"></textarea>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
                     <div>
@@ -142,6 +141,14 @@
         el.innerHTML = `로그인 상태 ✅ <img src="${u.pictureUrl||''}" alt="">
           <strong>${u.name||''}</strong> (${u.email||''})
           <br/>토큰: <code>${t.slice(0,20)}...${t.slice(-8)}</code>`;
+
+        if(!u.walletAddress){
+          el.innerHTML += `<br/><button class="primary" id="btnWallet">지갑 연결</button>`;
+          setTimeout(()=>{ $('btnWallet').onclick = connectWallet }, 0);
+        } else {
+          el.innerHTML += `<br/>지갑 주소: <code>${u.walletAddress}</code>`;
+        }
+
         show($('modelCard'));
       } else {
         el.textContent = '로그아웃 상태 ❌';
@@ -165,26 +172,59 @@
               setToken(data.accessToken);
               setUser(data.user || {});
               out(data);
-              show($('modelCard'));         // ✅ 로그인 성공 시 모델 카드 표시
+              show($('modelCard'));
             } else {
               out('응답에 accessToken이 없음:\n'+txt);
             }
             popup.close(); clearInterval(timer);
           }
-        }catch(e){ /* 구글 도메인일 땐 교차출처로 접근 불가. 무시하고 대기 */ }
+        }catch(e){}
       }, 200);
     }
 
     async function callMe(){
       const t = getToken();
       if(!t){ out('토큰 없음. 먼저 로그인하세요.'); return; }
-      const res = await fetch('/me', { headers: {Authorization: 'Bearer '+t} });
-      out(await res.json());
+      const res = await fetch('/api/users/me', { headers: {Authorization: 'Bearer '+t} });
+      const data = await res.json();
+      setUser({...getUser(), ...data});
+      out(data);
+      updateStatus();
     }
 
     function logout(){
       clearAll();
       out('클라이언트 토큰 삭제 완료');
+    }
+
+    // ---------- 지갑 연결 ----------
+    async function connectWallet(){
+      if(!window.solana || !window.solana.isPhantom){
+        alert("Phantom 지갑을 설치하세요");
+        return;
+      }
+      try {
+        const resp = await window.solana.connect();
+        const pubkey = resp.publicKey.toString();
+        const u = getUser();
+        const t = getToken();
+
+        const res = await fetch(`/api/users/${u.id}/wallet`, {
+          method:"PATCH",
+          headers:{
+            "Content-Type":"application/json",
+            Authorization:"Bearer "+t
+          },
+          body: JSON.stringify({walletAddress: pubkey})
+        });
+        const data = await res.json();
+        u.walletAddress = data.walletAddress;
+        setUser(u);
+        updateStatus();
+        alert("지갑 연동 완료: "+pubkey);
+      } catch (err) {
+        alert("지갑 연결 실패: "+err.message);
+      }
     }
 
     // ---------- 모델 등록 ----------
@@ -218,11 +258,6 @@
           lineage:     safeParse('lineage')
         };
 
-        if(!body.modelName || !body.versionName || !body.modalityCode || !body.licenseCode){
-          outCreate('필수값(모델 이름/버전/모달리티/라이선스)을 입력하세요.');
-          return;
-        }
-
         const res = await fetch('/api/models', {
           method: 'POST',
           headers: {
@@ -249,7 +284,6 @@
     $('btnLogout').onclick = logout;
     $('modelForm').addEventListener('submit', submitModel);
 
-    // 초기 상태 반영
     updateStatus();
     if(getToken()) callMe();
 </script>

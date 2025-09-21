@@ -1,10 +1,7 @@
 package com.example.capstone.user.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.Instant;
 
@@ -12,8 +9,8 @@ import java.time.Instant;
 @Table(name = "users")
 @Getter
 @NoArgsConstructor
-@Builder
 @AllArgsConstructor
+@Builder
 public class AppUser {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,16 +32,23 @@ public class AppUser {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "wallet_address", length = 64)
+    private String walletAddress;
+
     @PrePersist
     void onCreate() {
-        if(createdAt == null) createdAt = Instant.now();
+        if (createdAt == null) createdAt = Instant.now();
     }
 
-    /** 구글 프로필 동기화용(필요 필드만 업데이트) */
+    /** 구글 프로필 동기화용 */
     public void updateFromGoogle(String email, String name, String pictureUrl) {
         if (email != null) this.email = email;
         if (name != null) this.name = name;
         if (pictureUrl != null) this.pictureUrl = pictureUrl;
     }
 
+    /** 지갑 주소 업데이트 */
+    public void updateWalletAddress(String walletAddress) {
+        this.walletAddress = walletAddress;
+    }
 }
