@@ -1,82 +1,95 @@
+// src/main/java/com/example/capstone/model/entity/ModelVersion.java
 package com.example.capstone.model.entity;
 
-import com.example.capstone.user.entity.AppUser;
-import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import lombok.Getter;
+import lombok.Setter;
 
-import java.time.Instant;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "model_versions", uniqueConstraints = @UniqueConstraint(name="uq_model_version", columnNames={"model_id","version_name"}))
+@Table(name = "model_versions")
 @Getter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Setter
 public class ModelVersion {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(optional=false) @JoinColumn(name="model_id")
+    /** 🔗 모델 연결 */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "model_id", nullable = false)
     private Model model;
 
-    @Column(name="version_name", nullable=false, length=50)
-    private String versionName;
+    @Column(name = "version_name", nullable = false, length = 50)
+    private String versionName; // 1.0.0
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable=false, length=16)
-    @Builder.Default
-    private ModelVersionStatus status = ModelVersionStatus.PUBLISHED;
+    @Column(nullable = false, length = 50)
+    private String status; // PUBLISHED 등
 
-    // 버전 기준 메타
-    @ManyToOne(optional=false) @JoinColumn(name="modality_id")
+    /** 🔗 모달리티 */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "modality_id", nullable = false)
     private Modality modality;
 
-    @ManyToOne(optional=false) @JoinColumn(name="license_id")
-    private LicenseDef license;
+    /** 🔗 라이선스 */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "license_id", nullable = false)
+    private License license;
 
-    @ManyToOne(optional=false) @JoinColumn(name="uploader_id")
-    private AppUser uploader;
+    /** 가격/통화 */
+    @Column(length = 10)
+    private String currency; // USDC
 
-    // 설명/릴리스
-    @Column(columnDefinition = "text")
+    @Column(name = "price_research")
+    private BigDecimal priceResearch;
+
+    @Column(name = "price_standard")
+    private BigDecimal priceStandard;
+
+    @Column(name = "price_enterprise")
+    private BigDecimal priceEnterprise;
+
+    /** 개요 및 부가 정보 */
+    @Column(columnDefinition = "TEXT")
     private String overview;
 
-    @Column(name="release_notes", columnDefinition = "longtext")
+    @Column(name = "release_notes", columnDefinition = "TEXT")
     private String releaseNotes;
 
+    @Column(name = "release_date")
     private LocalDate releaseDate;
 
-    // 저장/무결성/온체인
-    @Column(name="cid_root", length=128) private String cidRoot;
-    @Column(name="checksum_root", length=128) private String checksumRoot;
-    @Column(name="onchain_tx", length=128) private String onchainTx;
+    @Column(name = "cid_root", length = 255)
+    private String cidRoot;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name="storage_json", columnDefinition = "json")
-    private JsonNode storageJson;
+    @Column(name = "checksum_root", length = 255)
+    private String checksumRoot;
 
-    // 여러 개 항목(JSON)
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name="metrics_json", columnDefinition = "json")
-    private JsonNode metricsJson;
+    @Column(name = "onchain_tx", length = 255)
+    private String onchainTx;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name="samples_json", columnDefinition = "json")
-    private JsonNode samplesJson;
+    @Column(name = "storage_json", columnDefinition = "TEXT")
+    private String storageJson;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name="lineage_json", columnDefinition = "json")
-    private JsonNode lineageJson;
+    @Column(name = "metrics_json", columnDefinition = "TEXT")
+    private String metricsJson;
 
-    @Column(name="created_at", nullable=false, updatable=false, insertable=false,
-            columnDefinition = "timestamp default current_timestamp")
-    private Instant createdAt;
+    @Column(name = "samples_json", columnDefinition = "TEXT")
+    private String samplesJson;
 
-    @Column(name="updated_at", nullable=false, insertable=false,
-            columnDefinition = "timestamp default current_timestamp on update current_timestamp")
-    private Instant updatedAt;
+    @Column(name = "lineage_json", columnDefinition = "TEXT")
+    private String lineageJson;
+
+    /** 등록 정보 */
+    @Column(name = "uploader_id")
+    private Long uploaderId;
+
+    @Column(name = "created_at")
+    private LocalDate createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDate updatedAt;
 }

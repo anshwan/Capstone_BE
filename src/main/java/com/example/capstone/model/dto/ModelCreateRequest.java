@@ -1,9 +1,11 @@
 package com.example.capstone.model.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record ModelCreateRequest(
@@ -23,6 +25,19 @@ public record ModelCreateRequest(
         JsonNode storage,   // 자유 JSON
         JsonNode metrics,   // 배열 JSON 권장
         JsonNode samples,   // 배열 JSON 권장
-        JsonNode lineage    // 배열 JSON 권장
+        JsonNode lineage,   // 배열 JSON 권장
+
+        /** 가격/통화 */
+        @Size(max = 10)
+        String currency,                    // 기본 USDC
+
+        @DecimalMin(value = "0.0", inclusive = true)
+        BigDecimal priceResearch,
+
+        @DecimalMin(value = "0.0", inclusive = true)
+        BigDecimal priceStandard,
+
+        @DecimalMin(value = "0.0", inclusive = true)
+        BigDecimal priceEnterprise
 
 ) { }

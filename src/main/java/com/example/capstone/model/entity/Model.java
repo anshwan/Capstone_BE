@@ -1,32 +1,30 @@
 package com.example.capstone.model.entity;
 
-import com.example.capstone.user.entity.AppUser;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "models")
 @Getter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Setter
 public class Model {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable=false, length=200)
-    private String name;
+    @Column(nullable = false, length = 200)
+    private String name;   // 모델 이름
 
-    @ManyToOne(optional = false) @JoinColumn(name = "created_by")
-    private AppUser createdBy;
+    @Column(name = "created_by", nullable = false)
+    private Long createdBy; // 등록자 id (User 테이블 FK)
 
-    @Column(name="created_at", nullable=false, updatable=false, insertable=false,
-            columnDefinition = "timestamp default current_timestamp")
-    private Instant createdAt;
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
 
-    @Column(name="updated_at", nullable=false, insertable=false,
-            columnDefinition = "timestamp default current_timestamp on update current_timestamp")
-    private Instant updatedAt;
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
 }
