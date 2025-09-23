@@ -42,28 +42,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                         .parseClaimsJws(token)
                         .getBody();
 
-                // ✅ sub 값 유연 처리 (숫자면 Long, 아니면 -1)
-                String subject = c.getSubject();
-                Long userId = null;
-                try {
-                    userId = Long.valueOf(subject);
-                } catch (NumberFormatException e) {
-                    userId = -1L; // 이메일 같은 경우는 -1 처리
-                }
-
-                String email = c.get("email", String.class);
-                String name  = c.get("name", String.class);
-                String pic   = c.get("picture", String.class);
+                Long userId = Long.valueOf(c.getSubject());
 
                 // roles 클레임 파싱
                 Collection<SimpleGrantedAuthority> authorities = parseAuthorities(c.get("roles"));
 
-                JwtUserPrincipal principal = new JwtUserPrincipal(
-                        userId,
-                        email,
-                        name,
-                        pic
-                );
+                // ✅ email/name/picture 제거 → 가벼운 Principal
+                JwtUserPrincipal principal = new JwtUserPrincipal(userId);
 
                 var auth = new UsernamePasswordAuthenticationToken(
                         principal,
@@ -77,7 +62,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                         .getContext().setAuthentication(auth);
 
             } catch (Exception e) {
-                // 토큰 검증 실패 → 로그 남기고 익명으로 통과
                 System.out.println("JWT parsing failed: " + e.getMessage());
             }
         }
