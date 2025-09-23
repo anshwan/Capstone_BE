@@ -26,7 +26,8 @@ spring:
             authorization-grant-type: authorization_code
             scope: openid, email, profile
             # baseUrl ?? ?? ??: ?? ?? ??
-            redirect-uri: "http://localhost:8080/login/oauth2/code/{registrationId}"
+            redirect-uri: "http://kau-capstone.duckdns.org:8080/login/oauth2/code/{registrationId}"
+
         provider:
           google:
             # Discovery ?? ??? ?????(? ?? ??)
