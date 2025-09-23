@@ -3,9 +3,7 @@ package com.example.capstone.model.entity;
 
 import com.example.capstone.user.entity.AppUser;
 import jakarta.persistence.*;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -14,6 +12,8 @@ import java.time.LocalDate;
 @Table(name = "model_versions")
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
 public class ModelVersion {
 
@@ -43,6 +43,7 @@ public class ModelVersion {
     private License license;
 
     /** 가격/통화 */
+    @Builder.Default
     @Column(length = 10, nullable = false)
     private String currency = "USDC";
 
