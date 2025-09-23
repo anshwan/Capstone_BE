@@ -2,125 +2,196 @@
 <html lang="ko">
 <head>
     <meta charset="utf-8"/>
-    <title>홈 - 로그인 & 모델 등록 테스트</title>
+    <title>홈 - 로그인 & 모델 등록 & 지갑 연결 테스트</title>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <style>
-        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 40px;}
-        .wrap{max-width:920px;margin:0 auto}
-        .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-        .card{border:1px solid #eee;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
-        button{padding:10px 14px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer}
-        .primary{background:#0b57d0;color:#fff;border:none}
-        pre{background:#0b1020;color:#d8e0ff;padding:12px;border-radius:8px;overflow:auto}
-        img{width:42px;height:42px;border-radius:50%;vertical-align:middle;object-fit:cover}
-        code{background:#f6f8fa;padding:2px 6px;border-radius:6px}
-        label{display:block;font-size:12px;color:#555;margin:10px 0 6px}
-        input,textarea,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px}
-        textarea{min-height:88px}
-        .hint{font-size:12px;color:#777}
-        .hide{display:none}
+        body {
+          font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+          margin: 40px;
+          background: #fafafa;
+          line-height: 1.6;
+        }
+        .wrap {
+          max-width: 720px;
+          margin: 0 auto;
+        }
+        .card {
+          border: 1px solid #eee;
+          border-radius: 12px;
+          padding: 20px;
+          margin-bottom: 24px;
+          box-shadow: 0 2px 8px rgba(0,0,0,.05);
+          background: #fff;
+        }
+        button {
+          padding: 10px 14px;
+          border-radius: 8px;
+          border: 1px solid #ddd;
+          background: #fff;
+          cursor: pointer;
+          margin: 4px 2px;
+        }
+        .primary {
+          background: #0b57d0;
+          color: #fff;
+          border: none;
+        }
+        pre {
+          background: #0b1020;
+          color: #d8e0ff;
+          padding: 12px;
+          border-radius: 8px;
+          overflow: auto;
+        }
+        img {
+          width: 42px;
+          height: 42px;
+          border-radius: 50%;
+          vertical-align: middle;
+          object-fit: cover;
+        }
+        code {
+          background: #f6f8fa;
+          padding: 2px 6px;
+          border-radius: 6px;
+        }
+        label {
+          display: block;
+          font-size: 13px;
+          font-weight: 500;
+          color: #444;
+          margin: 12px 0 6px;
+        }
+        input, textarea, select {
+          width: 100%;
+          padding: 10px;
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          font-size: 14px;
+        }
+        textarea {
+          min-height: 88px;
+          resize: vertical;
+        }
+        .hint {
+          font-size: 12px;
+          color: #777;
+        }
+        .hide {
+          display: none;
+        }
     </style>
 </head>
 <body>
 <div class="wrap">
-    <h2>Google OAuth + JWT → 모델 등록 테스트</h2>
+    <h2>Google OAuth + JWT → Phantom 지갑 연동 + 모델 등록</h2>
 
-    <div class="grid">
-        <!-- 로그인 카드 -->
-        <div class="card">
-            <h3>1) 로그인</h3>
-            <p id="status">로그아웃 상태 ❌</p>
-            <p>
-                <button class="primary" id="btnLogin">Google 로그인</button>
-                <button id="btnMe">/me 호출</button>
-                <button id="btnLogout">로그아웃(토큰삭제)</button>
+    <!-- 로그인 카드 -->
+    <div class="card">
+        <h3>1) 로그인</h3>
+        <p id="status">로그아웃 상태 ❌</p>
+        <div>
+            <button class="primary" id="btnLogin">Google 로그인</button>
+            <button id="btnMe">/me 호출</button>
+            <button id="btnLogout">로그아웃(토큰삭제)</button>
+            <button class="primary" id="btnWallet">지갑 연결</button>
+        </div>
+
+        <h4>응답</h4>
+        <pre id="output">(여기에 응답이 표시됩니다)</pre>
+        <h4>지갑 상태</h4>
+        <pre id="walletOut">(지갑 주소가 표시됩니다)</pre>
+    </div>
+
+    <!-- 모델 등록 카드 -->
+    <div class="card hide" id="modelCard">
+        <h3>2) 모델 등록</h3>
+        <form id="modelForm">
+            <label>모델 이름 *</label>
+            <input id="modelName" required>
+
+            <label>버전명 *</label>
+            <input id="versionName" required>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div>
+                    <label>모달리티 코드 *</label>
+                    <select id="modalityCode" required>
+                        <option value="">선택</option>
+                        <option>LLM</option>
+                        <option>VLM</option>
+                        <option>IMAGE</option>
+                    </select>
+                </div>
+                <div>
+                    <label>라이선스 코드 *</label>
+                    <select id="licenseCode" required>
+                        <option value="">선택</option>
+                        <option value="RESEARCH">RESEARCH</option>
+                        <option value="COMMERCIAL">COMMERCIAL</option>
+                        <option value="ONPREM">ONPREM</option>
+                        <option value="FT">FT</option>
+                    </select>
+                </div>
+            </div>
+
+            <label>통화 (Currency)</label>
+            <select id="currency" required>
+                <option value="USDC" selected>USDC</option>
+                <option value="KRW">KRW</option>
+                <option value="USD">USD</option>
+            </select>
+
+            <label>연구용 가격</label>
+            <input id="priceResearch" type="number" value="0">
+
+            <label>표준 가격</label>
+            <input id="priceStandard" type="number" value="0">
+
+            <label>엔터프라이즈 가격</label>
+            <input id="priceEnterprise" type="number" value="0">
+
+            <label>모델 개요</label>
+            <textarea id="overview"></textarea>
+
+            <label>릴리스 노트</label>
+            <textarea id="releaseNotes"></textarea>
+
+            <label>릴리스 날짜</label>
+            <input id="releaseDate" type="date">
+
+            <label>루트 CID</label>
+            <input id="cidRoot">
+
+            <label>체크섬 루트</label>
+            <input id="checksumRoot">
+
+            <label>온체인 TX</label>
+            <input id="onchainTx">
+
+            <label>storage(JSON)</label>
+            <textarea id="storage">{ "pinned": true }</textarea>
+
+            <label>metrics(JSON 배열)</label>
+            <textarea id="metrics">[ { "code":"MMLU", "value":85.2, "unit":"%" } ]</textarea>
+
+            <label>samples(JSON 배열)</label>
+            <textarea id="samples">[ { "input_type":"TEXT", "prompt":"안녕?", "output_text":"반가워!" } ]</textarea>
+
+            <label>lineage(JSON 배열)</label>
+            <textarea id="lineage">[]</textarea>
+
+            <p style="margin-top:14px">
+                <button class="primary" type="submit">모델 등록</button>
             </p>
-            <h4>응답</h4>
-            <pre id="output">(여기에 응답이 표시됩니다)</pre>
-        </div>
+        </form>
 
-        <!-- 모델 등록 카드 -->
-        <div class="card hide" id="modelCard">
-            <h3>2) 모델 등록</h3>
-            <form id="modelForm">
-                <label>모델 이름 *</label>
-                <input id="modelName" placeholder="예) My Great LLM" required>
-
-                <label>버전명 *</label>
-                <input id="versionName" placeholder="예) v1.0 또는 7B-instruct" required>
-
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                    <div>
-                        <label>모달리티 코드 *</label>
-                        <select id="modalityCode" required>
-                            <option value="">선택</option>
-                            <option>LLM</option>
-                            <option>VLM</option>
-                            <option value="IMAGE">IMAGE</option>
-                        </select>
-                        <div class="hint">사전에 modality 테이블에 시드 필요</div>
-                    </div>
-                    <div>
-                        <label>라이선스 코드 *</label>
-                        <select id="licenseCode" required>
-                            <option value="">선택</option>
-                            <option value="RESEARCH">RESEARCH</option>
-                            <option value="COMMERCIAL">COMMERCIAL</option>
-                            <option value="ONPREM">ONPREM</option>
-                            <option value="FT">FT</option>
-                        </select>
-                    </div>
-                </div>
-
-                <label>모델 개요</label>
-                <textarea id="overview"></textarea>
-
-                <label>릴리스 노트</label>
-                <textarea id="releaseNotes"></textarea>
-
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-                    <div>
-                        <label>릴리스 날짜</label>
-                        <input id="releaseDate" type="date">
-                    </div>
-                    <div>
-                        <label>루트 CID</label>
-                        <input id="cidRoot" placeholder="bafy...">
-                    </div>
-                    <div>
-                        <label>체크섬 루트</label>
-                        <input id="checksumRoot" placeholder="sha256:...">
-                    </div>
-                </div>
-
-                <label>온체인 TX</label>
-                <input id="onchainTx" placeholder="Solana tx signature">
-
-                <label>storage(JSON)</label>
-                <textarea id="storage">{ "pinned": true }</textarea>
-
-                <label>metrics(JSON 배열)</label>
-                <textarea id="metrics">[ { "code":"MMLU", "value":85.2, "unit":"%" } ]</textarea>
-
-                <label>samples(JSON 배열)</label>
-                <textarea id="samples">[ { "input_type":"TEXT", "prompt":"안녕?", "output_text":"반가워!" } ]</textarea>
-
-                <label>lineage(JSON 배열)</label>
-                <textarea id="lineage">[]</textarea>
-
-                <p style="margin-top:14px">
-                    <button class="primary" type="submit">모델 등록</button>
-                </p>
-            </form>
-
-            <h4>등록 결과</h4>
-            <pre id="createOut">(등록 결과가 표시됩니다)</pre>
-        </div>
+        <h4>등록 결과</h4>
+        <pre id="createOut">(등록 결과가 표시됩니다)</pre>
     </div>
 </div>
 
 <script>
-    // ---------- 공용 유틸 ----------
     const $ = (id)=>document.getElementById(id);
     const out = (x)=>$('output').textContent = typeof x==='string'? x : JSON.stringify(x,null,2);
     const outCreate = (x)=>$('createOut').textContent = typeof x==='string'? x : JSON.stringify(x,null,2);
@@ -141,14 +212,6 @@
         el.innerHTML = `로그인 상태 ✅ <img src="${u.pictureUrl||''}" alt="">
           <strong>${u.name||''}</strong> (${u.email||''})
           <br/>토큰: <code>${t.slice(0,20)}...${t.slice(-8)}</code>`;
-
-        if(!u.walletAddress){
-          el.innerHTML += `<br/><button class="primary" id="btnWallet">지갑 연결</button>`;
-          setTimeout(()=>{ $('btnWallet').onclick = connectWallet }, 0);
-        } else {
-          el.innerHTML += `<br/>지갑 주소: <code>${u.walletAddress}</code>`;
-        }
-
         show($('modelCard'));
       } else {
         el.textContent = '로그아웃 상태 ❌';
@@ -156,7 +219,6 @@
       }
     }
 
-    // ---------- 로그인 ----------
     function login(){
       const popup = window.open('/oauth2/authorization/google','oauth2','width=520,height=720');
       if(!popup){ out('팝업 차단됨. 허용 후 다시 시도.'); return; }
@@ -172,7 +234,7 @@
               setToken(data.accessToken);
               setUser(data.user || {});
               out(data);
-              show($('modelCard'));
+              callMe();
             } else {
               out('응답에 accessToken이 없음:\n'+txt);
             }
@@ -185,7 +247,7 @@
     async function callMe(){
       const t = getToken();
       if(!t){ out('토큰 없음. 먼저 로그인하세요.'); return; }
-      const res = await fetch('/api/users/me', { headers: {Authorization: 'Bearer '+t} });
+      const res = await fetch('/me', { headers: {Authorization: 'Bearer '+t} });
       const data = await res.json();
       setUser({...getUser(), ...data});
       out(data);
@@ -197,37 +259,38 @@
       out('클라이언트 토큰 삭제 완료');
     }
 
-    // ---------- 지갑 연결 ----------
+    /** ✅ Phantom 지갑 연결 */
     async function connectWallet(){
       if(!window.solana || !window.solana.isPhantom){
-        alert("Phantom 지갑을 설치하세요");
+        alert("Phantom 지갑을 설치하세요.");
         return;
       }
       try {
         const resp = await window.solana.connect();
         const pubkey = resp.publicKey.toString();
-        const u = getUser();
-        const t = getToken();
+        $('walletOut').textContent = "지갑 주소: " + pubkey;
 
-        const res = await fetch(`/api/users/${u.id}/wallet`, {
-          method:"PATCH",
-          headers:{
-            "Content-Type":"application/json",
-            Authorization:"Bearer "+t
-          },
-          body: JSON.stringify({walletAddress: pubkey})
-        });
-        const data = await res.json();
-        u.walletAddress = data.walletAddress;
-        setUser(u);
-        updateStatus();
-        alert("지갑 연동 완료: "+pubkey);
+        // 서버에도 저장하려면 PATCH 요청
+        const t = getToken();
+        const u = getUser();
+        if(u.id){
+          const res = await fetch(`/api/users/${u.id}/wallet`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + t
+            },
+            body: JSON.stringify({ walletAddress: pubkey })
+          });
+          const data = await res.json();
+          u.walletAddress = data.walletAddress;
+          setUser(u);
+        }
       } catch (err) {
-        alert("지갑 연결 실패: "+err.message);
+        alert("지갑 연결 실패: " + err.message);
       }
     }
 
-    // ---------- 모델 등록 ----------
     function safeParse(id){
       const txt = $(id).value.trim();
       if(!txt) return null;
@@ -246,6 +309,10 @@
           versionName: $('versionName').value.trim(),
           modalityCode:$('modalityCode').value,
           licenseCode: $('licenseCode').value,
+          priceResearch: parseFloat($('priceResearch').value || "0"),
+          priceStandard: parseFloat($('priceStandard').value || "0"),
+          priceEnterprise: parseFloat($('priceEnterprise').value || "0"),
+          currency: $('currency').value || "USDC",
           overview:    $('overview').value,
           releaseNotes:$('releaseNotes').value,
           releaseDate: $('releaseDate').value || null,
@@ -258,7 +325,7 @@
           lineage:     safeParse('lineage')
         };
 
-        const res = await fetch('/api/models', {
+        const res = await fetch('/api/models/upload', {
           method: 'POST',
           headers: {
             'Content-Type':'application/json',
@@ -278,10 +345,10 @@
       }
     }
 
-    // ---------- 바인딩 ----------
     $('btnLogin').onclick = login;
     $('btnMe').onclick = callMe;
     $('btnLogout').onclick = logout;
+    $('btnWallet').onclick = connectWallet;
     $('modelForm').addEventListener('submit', submitModel);
 
     updateStatus();

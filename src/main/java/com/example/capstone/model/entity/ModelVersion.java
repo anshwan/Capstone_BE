@@ -1,7 +1,9 @@
 // src/main/java/com/example/capstone/model/entity/ModelVersion.java
 package com.example.capstone.model.entity;
 
+import com.example.capstone.user.entity.AppUser;
 import jakarta.persistence.*;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -12,6 +14,7 @@ import java.time.LocalDate;
 @Table(name = "model_versions")
 @Getter
 @Setter
+@Builder
 public class ModelVersion {
 
     @Id
@@ -26,8 +29,8 @@ public class ModelVersion {
     @Column(name = "version_name", nullable = false, length = 50)
     private String versionName; // 1.0.0
 
-    @Column(nullable = false, length = 50)
-    private String status; // PUBLISHED 등
+    @Enumerated(EnumType.STRING)
+    private ModelVersionStatus status;
 
     /** 🔗 모달리티 */
     @ManyToOne(fetch = FetchType.LAZY)
@@ -40,8 +43,8 @@ public class ModelVersion {
     private License license;
 
     /** 가격/통화 */
-    @Column(length = 10)
-    private String currency; // USDC
+    @Column(length = 10, nullable = false)
+    private String currency = "USDC";
 
     @Column(name = "price_research")
     private BigDecimal priceResearch;
@@ -84,8 +87,10 @@ public class ModelVersion {
     private String lineageJson;
 
     /** 등록 정보 */
-    @Column(name = "uploader_id")
-    private Long uploaderId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "uploader_id", nullable = false)
+    private AppUser uploader;
+
 
     @Column(name = "created_at")
     private LocalDate createdAt;

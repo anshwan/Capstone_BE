@@ -1,5 +1,6 @@
 package com.example.capstone.model.dto;
 
+import com.example.capstone.model.entity.ModelVersionStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -14,7 +15,7 @@ public class ModelDetailDto {
     private Long id;                 // 모델 ID
     private String name;             // 모델 이름
     private String versionName;      // 버전 이름
-    private String status;           // 상태 (예: PUBLISHED)
+    private ModelVersionStatus status;         // 상태 (예: PUBLISHED)
     private String uploader;         // 등록자
     private String modality;         // 모달리티 이름
     private String license;          // 라이선스 이름
