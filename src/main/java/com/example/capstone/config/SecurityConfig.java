@@ -28,12 +28,21 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // ✅ Swagger 관련 URL 전부 허용
+                        .requestMatchers(
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**"
+                        ).permitAll()
+
+                        // ✅ 기본적으로 열어둔 URL
                         .requestMatchers("/", "/index.html", "/health", "/static/**").permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .requestMatchers("/api/models/**").permitAll()
+
+                        // ✅ 나머지는 인증 필요
                         .anyRequest().authenticated()
                 )
-
                 .oauth2Login(oauth -> oauth
                         .successHandler(googleSuccessHandler)
                 )
