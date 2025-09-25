@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -97,6 +98,32 @@ public class ModelService {
                 version.getChecksumRoot(),
                 version.getOnchainTx()
         );
+    }
+
+    /**
+     * 모델 필터링 조회
+     */
+    @Transactional(readOnly = true)
+    public List<ModelSummaryDto> filterModels(
+            String modality,
+            String license,
+            Double maxPrice,
+            Double minPerformance
+    ) {
+        List<ModelSummaryDto> allModels = getAllModels();
+
+        return allModels.stream()
+                .filter(dto -> modality == null || dto.getModality().equalsIgnoreCase(modality))
+                .filter(dto -> license == null || dto.getLicense().equalsIgnoreCase(license))
+                .filter(dto -> maxPrice == null || dto.getPriceStandard() == null || dto.getPriceStandard() <= maxPrice)
+                .filter(dto -> {
+                    if (minPerformance == null || dto.getMetrics() == null) return true;
+                    OptionalDouble min = dto.getMetrics().values().stream()
+                            .mapToDouble(v -> Double.parseDouble(v.toString()))
+                            .min();
+                    return min.isPresent() && min.getAsDouble() >= minPerformance;
+                })
+                .collect(Collectors.toList());
     }
 
     /**
