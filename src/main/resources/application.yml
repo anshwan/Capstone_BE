@@ -29,7 +29,7 @@ spring:
               - email
               - profile
             # baseUrl ?? ?? ??: ?? ?? ??
-            redirect-uri: "http://kau-capstone.duckdns.org:8080/login/oauth2/code/{registrationId}"
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
 
         provider:
           google:
