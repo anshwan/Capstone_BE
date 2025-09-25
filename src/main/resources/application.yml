@@ -24,7 +24,10 @@ spring:
             client-id: ${GOOGLE_CLIENT_ID}
             client-secret: ${GOOGLE_CLIENT_SECRET}
             authorization-grant-type: authorization_code
-            scope: openid, email, profile
+            scope:
+              - openid
+              - email
+              - profile
             # baseUrl ?? ?? ??: ?? ?? ??
             redirect-uri: "http://kau-capstone.duckdns.org:8080/login/oauth2/code/{registrationId}"
 
