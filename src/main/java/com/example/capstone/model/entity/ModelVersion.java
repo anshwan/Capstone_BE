@@ -87,6 +87,14 @@ public class ModelVersion {
     @Column(name = "lineage_json", columnDefinition = "TEXT")
     private String lineageJson;
 
+    // 추가
+    @Column(columnDefinition = "TEXT")
+    private String accessJson;
+
+    // 추가
+    @Column(columnDefinition = "TEXT")
+    private String ioLimitsJson;
+
     /** 등록 정보 */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uploader_id", nullable = false)
