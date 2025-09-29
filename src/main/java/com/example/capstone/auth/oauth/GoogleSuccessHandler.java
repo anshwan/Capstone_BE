@@ -11,7 +11,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 import java.io.IOException;
-import java.util.Map;
+import jakarta.servlet.http.Cookie;
 
 @Component
 public class GoogleSuccessHandler implements AuthenticationSuccessHandler {
@@ -35,11 +35,18 @@ public class GoogleSuccessHandler implements AuthenticationSuccessHandler {
         AppUser user = userService.upsertGoogleUser(sub, email, name, pic);
         String access = jwtIssuer.issueAccessToken(user);
 
-        res.setContentType("application/json");
-        res.getWriter().write(om.writeValueAsString(Map.of(
-                "accessToken", access, "tokenType", "Bearer",
-                "user", Map.of("id", user.getId(), "email", user.getEmail(), "name", user.getName(), "pictureUrl", user.getPictureUrl())
-        )));
-        res.getWriter().flush();
+        // 🍪 HttpOnly 쿠키에 토큰 저장
+        Cookie cookie = new Cookie("accessToken", access);
+        cookie.setHttpOnly(true);   // JS에서 접근 불가
+        cookie.setSecure(true);     // HTTPS에서만 전송 (개발환경이면 false)
+        cookie.setPath("/");        // 모든 경로에서 사용 가능
+        cookie.setMaxAge(60 * 60);  // 1시간
+
+        res.addCookie(cookie);
+
+        // ✅ 로그인 후 프론트 페이지로 리다이렉트
+        res.sendRedirect("https://ai-modelhub-platform.vercel.app/home");
     }
+
+
 }
