@@ -69,6 +69,20 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         chain.doFilter(req, res);
     }
 
+    /**
+     * ✅ 특정 경로는 JWT 필터를 아예 적용하지 않음
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+
+        return path.startsWith("/api/models")   // 모델 조회 API
+                || path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs")
+                || path.startsWith("/health")
+                || path.equals("/");
+    }
+
     private Collection<SimpleGrantedAuthority> parseAuthorities(Object rolesClaim) {
         if (rolesClaim == null) {
             return List.of(new SimpleGrantedAuthority("ROLE_USER"));
