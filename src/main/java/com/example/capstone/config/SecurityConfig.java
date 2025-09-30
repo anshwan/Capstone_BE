@@ -1,4 +1,3 @@
-// src/main/java/com/example/capstone/config/SecurityConfig.java
 package com.example.capstone.config;
 
 import com.example.capstone.auth.jwt.JwtAuthFilter;
@@ -19,6 +18,7 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
     private final JwtAuthFilter jwtAuthFilter;
     private final GoogleSuccessHandler googleSuccessHandler;
 
@@ -34,35 +34,42 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // ✅ CORS 설정
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Swagger (공개 문서)
                         .requestMatchers(
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
                         ).permitAll()
-                        .requestMatchers("/", "/index.html", "/health", "/static/**").permitAll()
+                        // Health Check & 공개 조회 API
+                        .requestMatchers("/health", "/api/models/**").permitAll()
+                        // Google OAuth2 로그인 콜백
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
-                        .requestMatchers("/api/models/**").permitAll()
+                        // 나머지는 인증 필요
                         .anyRequest().authenticated()
                 )
+                // 소셜 로그인 성공 핸들러
                 .oauth2Login(oauth -> oauth.successHandler(googleSuccessHandler))
+                // 로그아웃
                 .logout(logout -> logout.logoutUrl("/logout").logoutSuccessUrl("/"))
+                // JWT 필터 적용
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // ✅ Swagger / FE / 프론트 도메인 CORS 허용
+    // ✅ Swagger + Frontend + 배포 도메인 CORS 허용
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(
-                "http://localhost:8080",               // Swagger UI
-                "http://localhost:3000",               // React Dev
-                "https://ai-modelhub-platform.vercel.app" // 배포된 프론트
+                "http://localhost:3000",                 // React 개발 환경
+                "http://localhost:8080",                 // Swagger UI (로컬)
+                "https://ai-modelhub-platform.vercel.app", // 배포된 FE
+                "https://kau-capstone.duckdns.org"       // 배포된 BE (Swagger)
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.addAllowedHeader("*"); // ✅ 모든 헤더 허용
-        config.setAllowCredentials(true); // 🍪 쿠키/Authorization 헤더 포함 허용
+        config.addAllowedHeader("*"); // 모든 헤더 허용
+        config.setAllowCredentials(true); // 쿠키, Authorization 헤더 허용
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
