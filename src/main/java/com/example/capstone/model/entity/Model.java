@@ -22,14 +22,28 @@ public class Model {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** 모델 이름 */
     @Column(nullable = false, length = 200)
-    private String name;   // 모델 이름
+    private String name;
 
-    @Column(name = "created_by", nullable = false)
-    private Long createdBy; // 등록자 id (User 테이블 FK)
+    /** 업로더/회사명 */
+    @Column(nullable = false, length = 200)
+    private String uploader;
+
+    /** 썸네일 이미지 */
+    @Column(length = 500)
+    private String thumbnail;
+
+    /** 컴플라이언스 정보 */
+    @Column(length = 200)
+    private String compliance;
+
+    /** 등록자 (AppUser FK) */
+    @Column(name = "created_by")
+    private Long createdBy;
 
     @CreatedDate
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @LastModifiedDate

@@ -1,35 +1,35 @@
 package com.example.capstone.model.dto;
 
-import com.example.capstone.model.entity.ModelVersionStatus;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
 @Data
 @AllArgsConstructor
+@NoArgsConstructor
+@Builder
 public class ModelDetailDto {
-    private Long id;                 // 모델 ID
-    private String name;             // 모델 이름
-    private String versionName;      // 버전 이름
-    private ModelVersionStatus status;         // 상태 (예: PUBLISHED)
-    private String uploader;         // 등록자
-    private String modality;         // 모달리티 이름
-    private String license;          // 라이선스 이름
-    private String currency;         // 화폐 단위
-    private BigDecimal priceResearch;   // 연구용 가격
-    private BigDecimal priceStandard;   // 표준 가격
-    private BigDecimal priceEnterprise; // 엔터프라이즈 가격
-    private String overview;            // 모델 개요
-    private Map<String, Object> metrics;   // ✅ String → Map
-    private List<Object> samples;          // ✅ String → List
-    private List<Object> lineage;         // 계보/학습 정보 (JSON)
-    private String releaseNotes;        // 릴리즈 노트
-    private LocalDate releaseDate;      // 릴리즈 날짜
-    private String cidRoot;             // IPFS CID
-    private String checksumRoot;        // 체크섬
-    private String onchainTx;           // 온체인 트랜잭션
+    private Long id;                       // 모델 ID
+    private String name;                   // 모델 이름
+    private String uploader;               // 업로더/회사명
+    private String versionName;            // 버전명
+    private String modality;               // 모달리티
+    private List<String> license;          // 라이선스 배열
+    private String releaseDate;            // 출시일
+    private String overview;               // 개요 설명
+    private Map<String, Object> pricing;   // 가격 정책
+    private Map<String, Object> metrics;   // 성능 지표
+    private Map<String, Object> technicalSpecs; // 기술 스펙 (contextWindow, maxOutputTokens 등)
+    private String compliance;             // 컴플라이언스 정보
+    private Object samples;                // 샘플 데이터 (LLM 텍스트, 이미지 프롬프트 등)
+    private List<Object> lineage;          // 계보 정보
+    private List<Object> releaseNotes;     // 릴리스 노트
+    private String cidRoot;                // IPFS CID
+    private String checksumRoot;           // 체크섬
+    private String onchainTx;              // 온체인 트랜잭션 해시
+    private String thumbnail;              // 썸네일 이미지
 }

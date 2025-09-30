@@ -1,4 +1,3 @@
-// src/main/java/com/example/capstone/model/dto/ModelUploadResponse.java
 package com.example.capstone.model.dto;
 
 import lombok.AllArgsConstructor;
@@ -15,10 +14,10 @@ public class ModelUploadResponse {
     private String versionName;
 
     /* 온체인 결과 */
-    private String onchainTx;           // tx signature (실패 시 더미)
-    private String onchainModelId;      // 온체인에서 발급된 모델 식별자(옵션, 실패시 null)
-    private boolean onchainSucceeded;   // true/false
+    private String onchainTx;           // 트랜잭션 서명
+    private String onchainModelId;      // 온체인 모델 ID (null 가능)
+    private boolean onchainSucceeded;   // 온체인 성공 여부
 
     /* 저장소 */
-    private String ipfsCid;             // cidRoot
+    private String ipfsCid;             // IPFS CID
 }

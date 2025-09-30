@@ -1,11 +1,9 @@
-// src/main/java/com/example/capstone/model/entity/ModelVersion.java
 package com.example.capstone.model.entity;
 
 import com.example.capstone.user.entity.AppUser;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
@@ -26,57 +24,33 @@ public class ModelVersion {
     @JoinColumn(name = "model_id", nullable = false)
     private Model model;
 
+    /** 버전명 */
     @Column(name = "version_name", nullable = false, length = 50)
-    private String versionName; // 1.0.0
+    private String versionName;
 
+    /** 상태 (예: ACTIVE, DEPRECATED) */
     @Enumerated(EnumType.STRING)
     private ModelVersionStatus status;
 
-    /** 🔗 모달리티 */
+    /** 모달리티 */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "modality_id", nullable = false)
     private Modality modality;
 
-    /** 🔗 라이선스 */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "license_id", nullable = false)
-    private License license;
-
-    /** 가격/통화 */
-    @Builder.Default
-    @Column(length = 10, nullable = false)
-    private String currency = "USDC";
-
-    @Column(name = "price_research")
-    private BigDecimal priceResearch;
-
-    @Column(name = "price_standard")
-    private BigDecimal priceStandard;
-
-    @Column(name = "price_enterprise")
-    private BigDecimal priceEnterprise;
-
-    /** 개요 및 부가 정보 */
-    @Column(columnDefinition = "TEXT")
-    private String overview;
-
-    @Column(name = "release_notes", columnDefinition = "TEXT")
-    private String releaseNotes;
-
+    /** 출시일 */
     @Column(name = "release_date")
     private LocalDate releaseDate;
 
-    @Column(name = "cid_root", length = 255)
-    private String cidRoot;
+    /** 개요 */
+    @Column(columnDefinition = "TEXT")
+    private String overview;
 
-    @Column(name = "checksum_root", length = 255)
-    private String checksumRoot;
+    /** JSON 컬럼들 */
+    @Column(name = "license_json", columnDefinition = "TEXT")
+    private String licenseJson;
 
-    @Column(name = "onchain_tx", length = 255)
-    private String onchainTx;
-
-    @Column(name = "storage_json", columnDefinition = "TEXT")
-    private String storageJson;
+    @Column(name = "pricing_json", columnDefinition = "TEXT")
+    private String pricingJson;
 
     @Column(name = "metrics_json", columnDefinition = "TEXT")
     private String metricsJson;
@@ -87,23 +61,24 @@ public class ModelVersion {
     @Column(name = "lineage_json", columnDefinition = "TEXT")
     private String lineageJson;
 
-    // 추가
-    @Column(columnDefinition = "TEXT")
-    private String accessJson;
+    @Column(name = "technical_specs_json", columnDefinition = "TEXT")
+    private String technicalSpecsJson;
 
-    // 추가
-    @Column(columnDefinition = "TEXT")
-    private String ioLimitsJson;
+    @Column(name = "release_notes_json", columnDefinition = "TEXT")
+    private String releaseNotesJson;
 
-    /** 등록 정보 */
+    /** 온체인 관련 */
+    @Column(name = "cid_root", length = 255)
+    private String cidRoot;
+
+    @Column(name = "checksum_root", length = 255)
+    private String checksumRoot;
+
+    @Column(name = "onchain_tx", length = 255)
+    private String onchainTx;
+
+    /** 업로더 (FK) */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "uploader_id", nullable = false)
+    @JoinColumn(name = "uploader_id")
     private AppUser uploader;
-
-
-    @Column(name = "created_at")
-    private LocalDate createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDate updatedAt;
 }

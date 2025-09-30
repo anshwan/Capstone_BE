@@ -6,8 +6,6 @@ import com.example.capstone.model.entity.Model;
 import com.example.capstone.model.entity.ModelVersion;
 import com.example.capstone.model.repository.ModelRepository;
 import com.example.capstone.model.repository.ModelVersionRepository;
-import com.example.capstone.user.entity.AppUser;
-import com.example.capstone.user.repository.AppUserRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,7 +20,6 @@ public class ModelService {
 
     private final ModelRepository modelRepository;
     private final ModelVersionRepository modelVersionRepository;
-    private final AppUserRepository appUserRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -39,22 +35,21 @@ public class ModelService {
         for (Model model : models) {
             List<ModelVersion> versions = modelVersionRepository.findByModelIdWithRelations(model.getId());
             if (!versions.isEmpty()) {
-                ModelVersion latest = versions.get(0);
+                ModelVersion latest = versions.get(0); // 최신 버전이라고 가정
 
-                AppUser user = appUserRepository.findById(model.getCreatedBy()).orElse(null);
-
-                Map<String, Object> metricsMap = parseJsonToMap(latest.getMetricsJson());
-
-                result.add(new ModelSummaryDto(
-                        model.getId(),
-                        model.getName(),
-                        (user != null ? user.getName() : "User-" + model.getCreatedBy()),
-                        latest.getModality().getName(),
-                        latest.getLicense().getName(),
-                        latest.getCurrency(),
-                        latest.getPriceStandard() != null ? latest.getPriceStandard().doubleValue() : null,
-                        metricsMap
-                ));
+                result.add(ModelSummaryDto.builder()
+                        .id(model.getId())
+                        .name(model.getName())
+                        .uploader(model.getUploader())
+                        .versionName(latest.getVersionName())
+                        .modality(latest.getModality().getCode())
+                        .license(parseJsonToList(latest.getLicenseJson()).stream().map(Object::toString).toList())
+                        .releaseDate(latest.getReleaseDate() != null ? latest.getReleaseDate().toString() : null)
+                        .pricing(parseJsonToMap(latest.getPricingJson()))
+                        .metrics(parseJsonToMap(latest.getMetricsJson()))
+                        .thumbnail(model.getThumbnail())
+                        .build()
+                );
             }
         }
         return result;
@@ -74,56 +69,27 @@ public class ModelService {
         }
         ModelVersion version = versions.get(0);
 
-        AppUser user = appUserRepository.findById(model.getCreatedBy()).orElse(null);
-
-        return new ModelDetailDto(
-                model.getId(),
-                model.getName(),
-                version.getVersionName(),
-                version.getStatus(),
-                (user != null ? user.getName() : "User-" + model.getCreatedBy()),
-                version.getModality().getName(),
-                version.getLicense().getName(),
-                version.getCurrency(),
-                version.getPriceResearch(),
-                version.getPriceStandard(),
-                version.getPriceEnterprise(),
-                version.getOverview(),
-                parseJsonToMap(version.getMetricsJson()),
-                parseJsonToList(version.getSamplesJson()),
-                parseJsonToList(version.getLineageJson()),
-                version.getReleaseNotes(),
-                version.getReleaseDate(),
-                version.getCidRoot(),
-                version.getChecksumRoot(),
-                version.getOnchainTx()
-        );
-    }
-
-    /**
-     * 모델 필터링 조회
-     */
-    @Transactional(readOnly = true)
-    public List<ModelSummaryDto> filterModels(
-            String modality,
-            String license,
-            Double maxPrice,
-            Double minPerformance
-    ) {
-        List<ModelSummaryDto> allModels = getAllModels();
-
-        return allModels.stream()
-                .filter(dto -> modality == null || dto.getModality().equalsIgnoreCase(modality))
-                .filter(dto -> license == null || dto.getLicense().equalsIgnoreCase(license))
-                .filter(dto -> maxPrice == null || dto.getPriceStandard() == null || dto.getPriceStandard() <= maxPrice)
-                .filter(dto -> {
-                    if (minPerformance == null || dto.getMetrics() == null) return true;
-                    OptionalDouble min = dto.getMetrics().values().stream()
-                            .mapToDouble(v -> Double.parseDouble(v.toString()))
-                            .min();
-                    return min.isPresent() && min.getAsDouble() >= minPerformance;
-                })
-                .collect(Collectors.toList());
+        return ModelDetailDto.builder()
+                .id(model.getId())
+                .name(model.getName())
+                .uploader(model.getUploader())
+                .versionName(version.getVersionName())
+                .modality(version.getModality().getCode())
+                .license(parseJsonToList(version.getLicenseJson()).stream().map(Object::toString).toList())
+                .releaseDate(version.getReleaseDate() != null ? version.getReleaseDate().toString() : null)
+                .overview(version.getOverview())
+                .pricing(parseJsonToMap(version.getPricingJson()))
+                .metrics(parseJsonToMap(version.getMetricsJson()))
+                .technicalSpecs(parseJsonToMap(version.getTechnicalSpecsJson()))
+                .compliance(model.getCompliance())
+                .samples(parseJsonToList(version.getSamplesJson()))
+                .lineage(parseJsonToList(version.getLineageJson()))
+                .releaseNotes(parseJsonToList(version.getReleaseNotesJson()))
+                .cidRoot(version.getCidRoot())
+                .checksumRoot(version.getChecksumRoot())
+                .onchainTx(version.getOnchainTx())
+                .thumbnail(model.getThumbnail())
+                .build();
     }
 
     /**
@@ -135,7 +101,7 @@ public class ModelService {
         try {
             return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
-            return Map.of("raw", json); // ✅ 원문 반환
+            return Map.of("raw", json);
         }
     }
 
@@ -148,7 +114,7 @@ public class ModelService {
         try {
             return objectMapper.readValue(json, new TypeReference<List<Object>>() {});
         } catch (Exception e) {
-            return List.of(json); // ✅ 원문 반환
+            return List.of(json);
         }
     }
 }

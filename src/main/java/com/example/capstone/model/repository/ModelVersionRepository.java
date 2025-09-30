@@ -16,7 +16,6 @@ public interface ModelVersionRepository extends JpaRepository<ModelVersion, Long
     @Query("""
         SELECT v FROM ModelVersion v
         JOIN FETCH v.modality m
-        JOIN FETCH v.license l
         WHERE v.model.id = :modelId
         ORDER BY v.id DESC
     """)
