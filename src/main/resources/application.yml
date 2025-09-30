@@ -1,7 +1,7 @@
 server:
   port: ${SERVER_PORT:8080}
   address: ${SERVER_ADDRESS:0.0.0.0}
-  forward-headers-strategy: framework
+  forward-headers-strategy: framework   # 프록시/리버스프록시 환경 시 원본 스킴/호스트 추적
 
 spring:
   datasource:
@@ -29,7 +29,10 @@ spring:
               - openid
               - email
               - profile
-            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"  # ✅ 로컬+배포 도메인 등록 필요
+            # ✅ 로컬/배포 둘 다 Google 콘솔 Redirect URI에 등록 필요
+            # http://localhost:8080/login/oauth2/code/google
+            # https://kau-capstone.duckdns.org/login/oauth2/code/google
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
         provider:
           google:
             authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
