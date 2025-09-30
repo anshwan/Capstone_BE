@@ -30,6 +30,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     HttpServletResponse res,
                                     FilterChain chain) throws ServletException, IOException {
 
+        String path = req.getRequestURI();
+
+        // ✅ Swagger, Health, 공개 API는 JWT 검사 패스
+        if (path.startsWith("/api/models")
+                || path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs")
+                || path.equals("/")
+                || path.startsWith("/health")) {
+            chain.doFilter(req, res);
+            return;
+        }
+
+        // ✅ JWT 검사
         String header = req.getHeader("Authorization");
 
         if (header != null && header.startsWith("Bearer ")) {
@@ -47,7 +60,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 // roles 클레임 파싱
                 Collection<SimpleGrantedAuthority> authorities = parseAuthorities(c.get("roles"));
 
-                // ✅ email/name/picture 제거 → 가벼운 Principal
+                // ✅ 최소 Principal (UserId만)
                 JwtUserPrincipal principal = new JwtUserPrincipal(userId);
 
                 var auth = new UsernamePasswordAuthenticationToken(
@@ -67,20 +80,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         chain.doFilter(req, res);
-    }
-
-    /**
-     * ✅ 특정 경로는 JWT 필터를 아예 적용하지 않음
-     */
-    @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-
-        return path.startsWith("/api/models")   // 모델 조회 API
-                || path.startsWith("/swagger-ui")
-                || path.startsWith("/v3/api-docs")
-                || path.startsWith("/health")
-                || path.equals("/");
     }
 
     private Collection<SimpleGrantedAuthority> parseAuthorities(Object rolesClaim) {
