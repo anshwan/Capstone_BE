@@ -30,19 +30,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     HttpServletResponse res,
                                     FilterChain chain) throws ServletException, IOException {
 
-        String path = req.getRequestURI();
-
-        // ✅ Swagger, Health, 공개 API는 JWT 검사 패스
-        if (path.startsWith("/api/models")
-                || path.startsWith("/swagger-ui")
-                || path.startsWith("/v3/api-docs")
-                || path.equals("/")
-                || path.startsWith("/health")) {
-            chain.doFilter(req, res);
-            return;
-        }
-
-        // ✅ JWT 검사
         String header = req.getHeader("Authorization");
 
         if (header != null && header.startsWith("Bearer ")) {
@@ -60,7 +47,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 // roles 클레임 파싱
                 Collection<SimpleGrantedAuthority> authorities = parseAuthorities(c.get("roles"));
 
-                // ✅ 최소 Principal (UserId만)
                 JwtUserPrincipal principal = new JwtUserPrincipal(userId);
 
                 var auth = new UsernamePasswordAuthenticationToken(
@@ -70,7 +56,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 );
                 auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(req));
 
-                // SecurityContext 에 인증 정보 저장
                 org.springframework.security.core.context.SecurityContextHolder
                         .getContext().setAuthentication(auth);
 
@@ -80,6 +65,23 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         chain.doFilter(req, res);
+    }
+
+    /**
+     * ✅ 공개 API는 JWT 검사 대상에서 제외
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+
+        return path.startsWith("/api/models")   // 공개 모델 조회 API
+                || path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs")
+                || path.startsWith("/health")
+                || path.equals("/")
+                || path.startsWith("/oauth2")
+                || path.startsWith("/login/oauth2")
+                || path.startsWith("/error");
     }
 
     private Collection<SimpleGrantedAuthority> parseAuthorities(Object rolesClaim) {
