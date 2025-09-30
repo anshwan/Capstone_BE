@@ -1,3 +1,4 @@
+// src/main/java/com/example/capstone/config/SecurityConfig.java
 package com.example.capstone.config;
 
 import com.example.capstone.auth.jwt.JwtAuthFilter;
@@ -30,7 +31,7 @@ public class SecurityConfig {
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // ✅ CORS 설정 추가
+                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // ✅ CORS 설정
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
@@ -43,23 +44,25 @@ public class SecurityConfig {
                         .requestMatchers("/api/models/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .oauth2Login(oauth -> oauth
-                        .successHandler(googleSuccessHandler)
-                )
+                .oauth2Login(oauth -> oauth.successHandler(googleSuccessHandler))
                 .logout(logout -> logout.logoutUrl("/logout").logoutSuccessUrl("/"))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // ✅ 프론트에서 오는 요청 허용
+    // ✅ Swagger / FE / 프론트 도메인 CORS 허용
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("https://ai-modelhub-platform.vercel.app", "http://localhost:3000"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
-        config.setAllowCredentials(true); // 🍪 쿠키 포함 허용
+        config.setAllowedOrigins(List.of(
+                "http://localhost:8080",               // Swagger UI
+                "http://localhost:3000",               // React Dev
+                "https://ai-modelhub-platform.vercel.app" // 배포된 프론트
+        ));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.addAllowedHeader("*"); // ✅ 모든 헤더 허용
+        config.setAllowCredentials(true); // 🍪 쿠키/Authorization 헤더 포함 허용
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
