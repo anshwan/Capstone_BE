@@ -29,19 +29,27 @@ spring:
               - openid
               - email
               - profile
-            # baseUrl ?? ?? ??: ?? ?? ??
-            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
-
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"  # ✅ 로컬+배포 도메인 등록 필요
         provider:
           google:
-            # Discovery ?? ??? ?????(? ?? ??)
             authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
             token-uri: https://oauth2.googleapis.com/token
             user-info-uri: https://openidconnect.googleapis.com/v1/userinfo
             jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
             user-name-attribute: sub
 
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+  api-docs:
+    path: /v3/api-docs
+  show-actuator: true
+
 logging:
   level:
     org.springframework.security.oauth2: DEBUG
     org.springframework.security: ${SECURITY_LOG_LEVEL:INFO}
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
