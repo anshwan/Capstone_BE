@@ -25,9 +25,9 @@ public class ModelController {
     }
 
     /** 특정 모델 상세 조회 */
-    @GetMapping(params = "id")
+    @GetMapping("/{id}")
     @Operation(summary = "모델 상세 조회", description = "모델 ID를 기준으로 상세 정보를 조회합니다.")
-    public ModelDetailResponse getModelDetail(@RequestParam Long id) {
+    public ModelDetailResponse getModelDetail(@PathVariable Long id) {
         return modelService.getModelDetail(id);
     }
 }
