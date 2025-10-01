@@ -2,52 +2,52 @@ package com.example.capstone.model.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.util.List;
 
 @Entity
 @Table(name = "models")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-@EntityListeners(AuditingEntityListener.class)
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Model {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** 모델 이름 */
     @Column(nullable = false, length = 200)
-    private String name;
+    private String name;               // 모델명
 
-    /** 업로더/회사명 */
     @Column(nullable = false, length = 200)
-    private String uploader;
+    private String uploader;           // 업로더/회사명
 
-    /** 썸네일 이미지 */
-    @Column(length = 500)
-    private String thumbnail;
+    @Column(name="version_name", nullable = false, length = 100)
+    private String versionName;        // 버전명
 
-    /** 컴플라이언스 정보 */
-    @Column(length = 200)
+    @Enumerated(EnumType.STRING)
+    private Modality modality;         // LLM, IMAGE_GENERATION, AUDIO, MULTIMODAL
+
+    @Column(columnDefinition = "json")
+    private String license;            // ["research","commercial"]
+
+    private LocalDate releaseDate;
+
+    @Column(columnDefinition = "TEXT")
+    private String overview;
+
     private String compliance;
+    private String thumbnail;
+    private String cidRoot;
+    private String checksumRoot;
+    private String onchainTx;
+    private String modelPda;
+    private String txSignature;
 
-    /** 등록자 (AppUser FK) */
-    @Column(name = "created_by")
-    private Long createdBy;
+    // 연관관계
+    @OneToMany(mappedBy = "model", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PricingPlan> pricingPlans;
 
-    @CreatedDate
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    @OneToMany(mappedBy = "model", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ReleaseNote> releaseNotes;
 
-    @LastModifiedDate
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
+    @OneToMany(mappedBy = "model", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Lineage> lineage;
 }

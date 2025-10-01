@@ -1,120 +1,198 @@
 package com.example.capstone.model.service;
 
-import com.example.capstone.model.dto.ModelDetailDto;
-import com.example.capstone.model.dto.ModelSummaryDto;
-import com.example.capstone.model.entity.Model;
-import com.example.capstone.model.entity.ModelVersion;
-import com.example.capstone.model.repository.ModelRepository;
-import com.example.capstone.model.repository.ModelVersionRepository;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.capstone.model.dto.ModelDetailResponse;
+import com.example.capstone.model.dto.ModelListResponse;
+import com.example.capstone.model.entity.*;
+import com.example.capstone.model.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ModelService {
-
     private final ModelRepository modelRepository;
-    private final ModelVersionRepository modelVersionRepository;
+    private final LlmSpecsRepository llmSpecsRepository;
+    private final ImageSpecsRepository imageSpecsRepository;
+    private final AudioSpecsRepository audioSpecsRepository;
+    private final MultimodalSpecsRepository multimodalSpecsRepository;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
-    /**
-     * 전체 모델 조회
-     * - 모델 기본 정보 + 최신 버전 정보만 포함
-     */
-    @Transactional(readOnly = true)
-    public List<ModelSummaryDto> getAllModels() {
-        List<Model> models = modelRepository.findAll();
-        List<ModelSummaryDto> result = new ArrayList<>();
-
-        for (Model model : models) {
-            List<ModelVersion> versions = modelVersionRepository.findByModelIdWithRelations(model.getId());
-            if (!versions.isEmpty()) {
-                ModelVersion latest = versions.get(0); // 최신 버전이라고 가정
-
-                result.add(ModelSummaryDto.builder()
-                        .id(model.getId())
-                        .name(model.getName())
-                        .uploader(model.getUploader())
-                        .versionName(latest.getVersionName())
-                        .modality(latest.getModality().getCode())
-                        .license(parseJsonToList(latest.getLicenseJson()).stream().map(Object::toString).toList())
-                        .releaseDate(latest.getReleaseDate() != null ? latest.getReleaseDate().toString() : null)
-                        .pricing(parseJsonToMap(latest.getPricingJson()))
-                        .metrics(parseJsonToMap(latest.getMetricsJson()))
-                        .thumbnail(model.getThumbnail())
-                        .build()
-                );
-            }
-        }
-        return result;
+    /** 전체 모델 조회 */
+    public List<ModelListResponse> getAllModels() {
+        return modelRepository.findAll().stream()
+                .map(this::toListDto)
+                .collect(Collectors.toList());
     }
 
-    /**
-     * 모델 상세 조회
-     */
-    @Transactional(readOnly = true)
-    public ModelDetailDto getModelDetail(Long modelId) {
-        Model model = modelRepository.findById(modelId)
-                .orElseThrow(() -> new RuntimeException("모델을 찾을 수 없습니다."));
+    /** 상세 조회 */
+    public ModelDetailResponse getModelDetail(Long id) {
+        Model model = modelRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("모델을 찾을 수 없습니다. id=" + id));
 
-        List<ModelVersion> versions = modelVersionRepository.findByModelIdWithRelations(modelId);
-        if (versions.isEmpty()) {
-            throw new RuntimeException("모델 버전을 찾을 수 없습니다.");
+        // 모달리티별 metrics / specs / sample
+        Map<String, Object> metrics = new HashMap<>();
+        Map<String, Object> technicalSpecs = new HashMap<>();
+        Object sample = null;
+
+        switch (model.getModality()) {
+            case LLM -> {
+                LlmSpecs spec = llmSpecsRepository.findById(id).orElse(null);
+                if (spec != null) {
+                    metrics.put("MMLU", spec.getMmlu());
+                    metrics.put("HellaSwag", spec.getHellaswag());
+                    metrics.put("ARC", spec.getArc());
+                    metrics.put("TruthfulQA", spec.getTruthfulqa());
+                    metrics.put("GSM8K", spec.getGsm8k());
+                    metrics.put("HumanEval", spec.getHumaneval());
+
+                    technicalSpecs.put("contextWindow", spec.getContextWindow());
+                    technicalSpecs.put("maxOutputTokens", spec.getMaxOutputTokens());
+
+                    sample = spec.getSampleOutput();
+                }
+            }
+            case IMAGE_GENERATION -> {
+                ImageSpecs spec = imageSpecsRepository.findById(id).orElse(null);
+                if (spec != null) {
+                    metrics.put("FID", spec.getFid());
+                    metrics.put("InceptionScore", spec.getInceptionScore());
+                    metrics.put("CLIPScore", spec.getClipScore());
+
+                    technicalSpecs.put("promptTokens", spec.getPromptTokens());
+                    technicalSpecs.put("maxOutputResolution", spec.getMaxOutputResolution());
+
+                    sample = Map.of(
+                            "prompt", spec.getSamplePrompt(),
+                            "outputImage", spec.getSampleOutputImage()
+                    );
+                }
+            }
+            case AUDIO -> {
+                AudioSpecs spec = audioSpecsRepository.findById(id).orElse(null);
+                if (spec != null) {
+                    metrics.put("WER_KO", spec.getWerKo());
+                    metrics.put("MOS", spec.getMos());
+                    metrics.put("Latency", spec.getLatency());
+
+                    technicalSpecs.put("maxAudioInput", spec.getMaxAudioInput());
+                    technicalSpecs.put("maxAudioOutput", spec.getMaxAudioOutput());
+                    technicalSpecs.put("sampleRate", spec.getSampleRate());
+
+                    sample = Map.of(
+                            "inputAudio", spec.getSampleInputAudio(),
+                            "output", spec.getSampleOutput()
+                    );
+                }
+            }
+            case MULTIMODAL -> {
+                MultimodalSpecs spec = multimodalSpecsRepository.findById(id).orElse(null);
+                if (spec != null) {
+                    metrics.put("MME", spec.getMme());
+                    metrics.put("OCR_F1", spec.getOcrF1());
+                    metrics.put("VQAv2", spec.getVqav2());
+
+                    technicalSpecs.put("textTokens", spec.getTextTokens());
+                    technicalSpecs.put("maxImages", spec.getMaxImages());
+                    technicalSpecs.put("maxImageResolution", spec.getMaxImageResolution());
+
+                    sample = Map.of(
+                            "inputImage", spec.getSampleInputImage(),
+                            "prompt", spec.getSamplePrompt(),
+                            "output", spec.getSampleOutput()
+                    );
+                }
+            }
         }
-        ModelVersion version = versions.get(0);
 
-        return ModelDetailDto.builder()
+        // Pricing 조립
+        Map<String, Object> pricingMap = new HashMap<>();
+        for (PricingPlan plan : model.getPricingPlans()) {
+            Map<String, Object> planMap = new HashMap<>();
+            planMap.put("price", plan.getPrice());
+            planMap.put("description", plan.getDescription());
+            planMap.put("billingType", plan.getBillingType().name().toLowerCase());
+
+            if (plan.getMonthlyTokenLimit() != null) planMap.put("monthlyTokenLimit", plan.getMonthlyTokenLimit());
+            if (plan.getMonthlyGenerationLimit() != null) planMap.put("monthlyGenerationLimit", plan.getMonthlyGenerationLimit());
+            if (plan.getMonthlyRequestLimit() != null) planMap.put("monthlyRequestLimit", plan.getMonthlyRequestLimit());
+
+            if (plan.getRights() != null) {
+                List<String> rightsList = Arrays.stream(plan.getRights()
+                                .replace("[", "")
+                                .replace("]", "")
+                                .replace("\"", "")
+                                .split(","))
+                        .map(String::trim)
+                        .toList();
+                planMap.put("rights", rightsList);
+            }
+
+            pricingMap.put(plan.getPlanType().name().toLowerCase(), planMap);
+        }
+
+        // Lineage 조립
+        List<Map<String,Object>> lineageList = model.getLineage().stream().map(l -> {
+            Map<String,Object> map = new LinkedHashMap<>();
+            map.put("step", l.getStep());
+            map.put("from", l.getFromModel());
+            map.put("to", l.getToModel());
+            map.put("relationship", l.getRelationship().name().toLowerCase());
+            return map;
+        }).collect(Collectors.toList());
+
+        // ReleaseNotes (note string만 반환)
+        List<String> releaseNotesList = model.getReleaseNotes().stream()
+                .map(ReleaseNote::getNote)
+                .toList();
+
+        // 최종 DTO
+        return ModelDetailResponse.builder()
                 .id(model.getId())
                 .name(model.getName())
                 .uploader(model.getUploader())
-                .versionName(version.getVersionName())
-                .modality(version.getModality().getCode())
-                .license(parseJsonToList(version.getLicenseJson()).stream().map(Object::toString).toList())
-                .releaseDate(version.getReleaseDate() != null ? version.getReleaseDate().toString() : null)
-                .overview(version.getOverview())
-                .pricing(parseJsonToMap(version.getPricingJson()))
-                .metrics(parseJsonToMap(version.getMetricsJson()))
-                .technicalSpecs(parseJsonToMap(version.getTechnicalSpecsJson()))
+                .versionName(model.getVersionName())
+                .modality(model.getModality().name())
+                .license(parseLicense(model.getLicense()))
+                .releaseDate(model.getReleaseDate())
+                .overview(model.getOverview())
                 .compliance(model.getCompliance())
-                .samples(parseJsonToList(version.getSamplesJson()))
-                .lineage(parseJsonToList(version.getLineageJson()))
-                .releaseNotes(parseJsonToList(version.getReleaseNotesJson()))
-                .cidRoot(version.getCidRoot())
-                .checksumRoot(version.getChecksumRoot())
-                .onchainTx(version.getOnchainTx())
+                .cidRoot(model.getCidRoot())
+                .checksumRoot(model.getChecksumRoot())
+                .onchainTx(model.getOnchainTx())
                 .thumbnail(model.getThumbnail())
+                .pricing(pricingMap)
+                .metrics(metrics)
+                .technicalSpecs(technicalSpecs)
+                .sample(sample)
+                .lineage(lineageList)
+                .releaseNotes(releaseNotesList)
                 .build();
     }
 
-    /**
-     * JSON 문자열 → Map 변환
-     * 실패하면 원문 그대로 담아서 반환
-     */
-    private Map<String, Object> parseJsonToMap(String json) {
-        if (json == null) return null;
-        try {
-            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
-        } catch (Exception e) {
-            return Map.of("raw", json);
-        }
+    /** 리스트용 DTO */
+    private ModelListResponse toListDto(Model m) {
+        return ModelListResponse.builder()
+                .id(m.getId())
+                .name(m.getName())
+                .uploader(m.getUploader())
+                .versionName(m.getVersionName())
+                .modality(m.getModality().name())
+                .license(parseLicense(m.getLicense()))
+                .releaseDate(m.getReleaseDate())
+                .thumbnail(m.getThumbnail())
+                .build();
     }
 
-    /**
-     * JSON 문자열 → List 변환
-     * 실패하면 원문 그대로 리스트로 반환
-     */
-    private List<Object> parseJsonToList(String json) {
-        if (json == null) return null;
-        try {
-            return objectMapper.readValue(json, new TypeReference<List<Object>>() {});
-        } catch (Exception e) {
-            return List.of(json);
-        }
+    private List<String> parseLicense(String licenseStr) {
+        if (licenseStr == null) return List.of();
+        return Arrays.stream(licenseStr
+                        .replace("[", "")
+                        .replace("]", "")
+                        .replace("\"", "")
+                        .split(","))
+                .map(String::trim)
+                .toList();
     }
 }

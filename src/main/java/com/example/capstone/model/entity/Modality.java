@@ -1,22 +1,5 @@
 package com.example.capstone.model.entity;
 
-import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
-@Entity
-@Table(name = "modality")
-@Getter
-@Setter
-public class Modality {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false, length = 32, unique = true)
-    private String code;   // LLM, VLM, IMAGE
-
-    @Column(nullable = false, length = 50)
-    private String name;   // 표시 이름
+public enum Modality {
+    LLM, IMAGE_GENERATION, AUDIO, MULTIMODAL
 }
