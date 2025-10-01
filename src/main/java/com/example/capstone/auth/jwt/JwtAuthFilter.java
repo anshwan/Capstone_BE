@@ -74,7 +74,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
 
-        return path.startsWith("/api/models")   // 공개 모델 조회 API
+        return path.equals("/api/models")   // 공개 모델 조회 API
+                || path.startsWith("/api/models")
                 || path.startsWith("/swagger-ui")
                 || path.startsWith("/v3/api-docs")
                 || path.startsWith("/health")

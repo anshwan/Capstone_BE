@@ -38,6 +38,7 @@ public class SecurityConfig {
                         "/swagger-ui/**",
                         "/v3/api-docs/**",
                         "/health",
+                        "/api/models",
                         "/api/models/**"   // 공개 API
                 )
                 .csrf(csrf -> csrf.disable())
