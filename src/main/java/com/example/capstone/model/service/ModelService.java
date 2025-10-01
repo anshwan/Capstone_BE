@@ -28,7 +28,7 @@ public class ModelService {
 
     /** 상세 조회 */
     public ModelDetailResponse getModelDetail(Long id) {
-        Model model = modelRepository.findById(id)
+        Model model = modelRepository.findDetailById(id)
                 .orElseThrow(() -> new IllegalArgumentException("모델을 찾을 수 없습니다. id=" + id));
 
         // 모달리티별 metrics / specs / sample
@@ -107,30 +107,7 @@ public class ModelService {
         }
 
         // Pricing 조립
-        Map<String, Object> pricingMap = new HashMap<>();
-        for (PricingPlan plan : model.getPricingPlans()) {
-            Map<String, Object> planMap = new HashMap<>();
-            planMap.put("price", plan.getPrice());
-            planMap.put("description", plan.getDescription());
-            planMap.put("billingType", plan.getBillingType().name().toLowerCase());
-
-            if (plan.getMonthlyTokenLimit() != null) planMap.put("monthlyTokenLimit", plan.getMonthlyTokenLimit());
-            if (plan.getMonthlyGenerationLimit() != null) planMap.put("monthlyGenerationLimit", plan.getMonthlyGenerationLimit());
-            if (plan.getMonthlyRequestLimit() != null) planMap.put("monthlyRequestLimit", plan.getMonthlyRequestLimit());
-
-            if (plan.getRights() != null) {
-                List<String> rightsList = Arrays.stream(plan.getRights()
-                                .replace("[", "")
-                                .replace("]", "")
-                                .replace("\"", "")
-                                .split(","))
-                        .map(String::trim)
-                        .toList();
-                planMap.put("rights", rightsList);
-            }
-
-            pricingMap.put(plan.getPlanType().name().toLowerCase(), planMap);
-        }
+        Map<String, Object> pricingMap = buildPricingMap(model);
 
         // Lineage 조립
         List<Map<String,Object>> lineageList = model.getLineage().stream().map(l -> {
@@ -171,8 +148,51 @@ public class ModelService {
                 .build();
     }
 
-    /** 리스트용 DTO */
+    /** 리스트용 DTO (pricing + metrics 풀로 넣음) */
     private ModelListResponse toListDto(Model m) {
+        // Pricing
+        Map<String, Object> pricingMap = buildPricingMap(m);
+
+        // Metrics (전체 조회에서도 풀 metrics 반환)
+        Map<String, Object> metrics = new HashMap<>();
+        switch (m.getModality()) {
+            case LLM -> {
+                LlmSpecs spec = llmSpecsRepository.findById(m.getId()).orElse(null);
+                if (spec != null) {
+                    metrics.put("MMLU", spec.getMmlu());
+                    metrics.put("HellaSwag", spec.getHellaswag());
+                    metrics.put("ARC", spec.getArc());
+                    metrics.put("TruthfulQA", spec.getTruthfulqa());
+                    metrics.put("GSM8K", spec.getGsm8k());
+                    metrics.put("HumanEval", spec.getHumaneval());
+                }
+            }
+            case IMAGE_GENERATION -> {
+                ImageSpecs spec = imageSpecsRepository.findById(m.getId()).orElse(null);
+                if (spec != null) {
+                    metrics.put("FID", spec.getFid());
+                    metrics.put("InceptionScore", spec.getInceptionScore());
+                    metrics.put("CLIPScore", spec.getClipScore());
+                }
+            }
+            case AUDIO -> {
+                AudioSpecs spec = audioSpecsRepository.findById(m.getId()).orElse(null);
+                if (spec != null) {
+                    metrics.put("WER_KO", spec.getWerKo());
+                    metrics.put("MOS", spec.getMos());
+                    metrics.put("Latency", spec.getLatency());
+                }
+            }
+            case MULTIMODAL -> {
+                MultimodalSpecs spec = multimodalSpecsRepository.findById(m.getId()).orElse(null);
+                if (spec != null) {
+                    metrics.put("MME", spec.getMme());
+                    metrics.put("OCR_F1", spec.getOcrF1());
+                    metrics.put("VQAv2", spec.getVqav2());
+                }
+            }
+        }
+
         return ModelListResponse.builder()
                 .id(m.getId())
                 .name(m.getName())
@@ -182,9 +202,41 @@ public class ModelService {
                 .license(parseLicense(m.getLicense()))
                 .releaseDate(m.getReleaseDate())
                 .thumbnail(m.getThumbnail())
+                .pricing(pricingMap.isEmpty() ? null : pricingMap)
+                .metrics(metrics.isEmpty() ? null : metrics)
                 .build();
     }
 
+    /** Pricing 공통 로직 */
+    private Map<String, Object> buildPricingMap(Model model) {
+        Map<String, Object> pricingMap = new HashMap<>();
+        for (PricingPlan plan : model.getPricingPlans()) {
+            Map<String, Object> planMap = new HashMap<>();
+            planMap.put("price", plan.getPrice());
+            planMap.put("description", plan.getDescription());
+            planMap.put("billingType", plan.getBillingType().name().toLowerCase());
+
+            if (plan.getMonthlyTokenLimit() != null) planMap.put("monthlyTokenLimit", plan.getMonthlyTokenLimit());
+            if (plan.getMonthlyGenerationLimit() != null) planMap.put("monthlyGenerationLimit", plan.getMonthlyGenerationLimit());
+            if (plan.getMonthlyRequestLimit() != null) planMap.put("monthlyRequestLimit", plan.getMonthlyRequestLimit());
+
+            if (plan.getRights() != null) {
+                List<String> rightsList = Arrays.stream(plan.getRights()
+                                .replace("[", "")
+                                .replace("]", "")
+                                .replace("\"", "")
+                                .split(","))
+                        .map(String::trim)
+                        .toList();
+                planMap.put("rights", rightsList);
+            }
+
+            pricingMap.put(plan.getPlanType().name().toLowerCase(), planMap);
+        }
+        return pricingMap;
+    }
+
+    /** License 문자열 파싱 */
     private List<String> parseLicense(String licenseStr) {
         if (licenseStr == null) return List.of();
         return Arrays.stream(licenseStr
@@ -193,6 +245,7 @@ public class ModelService {
                         .replace("\"", "")
                         .split(","))
                 .map(String::trim)
+                .filter(s -> !s.isEmpty())
                 .toList();
     }
 }
