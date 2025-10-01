@@ -6,6 +6,7 @@ import com.example.capstone.model.entity.*;
 import com.example.capstone.model.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;   // ⬅️ 추가
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -20,13 +21,15 @@ public class ModelService {
     private final MultimodalSpecsRepository multimodalSpecsRepository;
 
     /** 전체 모델 조회 */
+    @Transactional(readOnly = true) // ⬅️ 세션 열어둠
     public List<ModelListResponse> getAllModels() {
-        return modelRepository.findAll().stream()
+        return modelRepository.findAllWithPricing().stream() // ⬅️ fetch된 결과 사용
                 .map(this::toListDto)
                 .collect(Collectors.toList());
     }
 
     /** 상세 조회 */
+    @Transactional(readOnly = true) // ⬅️ 세션 열어둠
     public ModelDetailResponse getModelDetail(Long id) {
         Model model = modelRepository.findDetailById(id)
                 .orElseThrow(() -> new IllegalArgumentException("모델을 찾을 수 없습니다. id=" + id));
@@ -106,10 +109,8 @@ public class ModelService {
             }
         }
 
-        // Pricing 조립
         Map<String, Object> pricingMap = buildPricingMap(model);
 
-        // Lineage 조립
         List<Map<String,Object>> lineageList = model.getLineage().stream().map(l -> {
             Map<String,Object> map = new LinkedHashMap<>();
             map.put("step", l.getStep());
@@ -119,12 +120,10 @@ public class ModelService {
             return map;
         }).collect(Collectors.toList());
 
-        // ReleaseNotes (note string만 반환)
         List<String> releaseNotesList = model.getReleaseNotes().stream()
                 .map(ReleaseNote::getNote)
                 .toList();
 
-        // 최종 DTO
         return ModelDetailResponse.builder()
                 .id(model.getId())
                 .name(model.getName())
@@ -148,12 +147,10 @@ public class ModelService {
                 .build();
     }
 
-    /** 리스트용 DTO (pricing + metrics 풀로 넣음) */
+    /** 리스트용 DTO (pricing + metrics 포함) */
     private ModelListResponse toListDto(Model m) {
-        // Pricing
         Map<String, Object> pricingMap = buildPricingMap(m);
 
-        // Metrics (전체 조회에서도 풀 metrics 반환)
         Map<String, Object> metrics = new HashMap<>();
         switch (m.getModality()) {
             case LLM -> {
@@ -210,6 +207,8 @@ public class ModelService {
     /** Pricing 공통 로직 */
     private Map<String, Object> buildPricingMap(Model model) {
         Map<String, Object> pricingMap = new HashMap<>();
+        if (model.getPricingPlans() == null) return pricingMap;
+
         for (PricingPlan plan : model.getPricingPlans()) {
             Map<String, Object> planMap = new HashMap<>();
             planMap.put("price", plan.getPrice());
@@ -227,6 +226,7 @@ public class ModelService {
                                 .replace("\"", "")
                                 .split(","))
                         .map(String::trim)
+                        .filter(s -> !s.isEmpty())
                         .toList();
                 planMap.put("rights", rightsList);
             }
