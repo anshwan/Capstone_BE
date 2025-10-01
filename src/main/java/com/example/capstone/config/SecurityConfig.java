@@ -4,8 +4,8 @@ import com.example.capstone.auth.jwt.JwtAuthFilter;
 import com.example.capstone.auth.oauth.GoogleSuccessHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -16,7 +16,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 @Configuration
-@EnableWebSecurity
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
@@ -27,26 +26,38 @@ public class SecurityConfig {
         this.googleSuccessHandler = googleSuccessHandler;
     }
 
+    /**
+     * ✅ 공개 API (Swagger + 모델조회) → 완전 공개
+     */
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    @Order(1)
+    public SecurityFilterChain publicChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher(
+                        "/swagger-ui.html",
+                        "/swagger-ui/**",
+                        "/v3/api-docs/**",
+                        "/health",
+                        "/api/models/**"   // 공개 API
+                )
+                .csrf(csrf -> csrf.disable())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+
+        return http.build();
+    }
+
+    /**
+     * ✅ 나머지 요청 → JWT + OAuth2 로그인 필수
+     */
+    @Bean
+    @Order(2)
+    public SecurityFilterChain securedChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        // ✅ Swagger & 문서
-                        .requestMatchers(
-                                "/swagger-ui.html",
-                                "/swagger-ui/**",
-                                "/v3/api-docs/**"
-                        ).permitAll()
-                        // ✅ 공개 API
-                        .requestMatchers("/health", "/api/models/**").permitAll()
-                        // ✅ OAuth2 로그인
-                        .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
-                        // ✅ 나머지 요청은 인증 필요
-                        .anyRequest().authenticated()
-                )
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
                 .oauth2Login(oauth -> oauth.successHandler(googleSuccessHandler))
                 .logout(logout -> logout.logoutUrl("/logout").logoutSuccessUrl("/"))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
