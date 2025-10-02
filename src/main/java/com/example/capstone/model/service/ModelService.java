@@ -132,7 +132,8 @@ public class ModelService {
                 .name(model.getName())
                 .uploader(model.getUploader())
                 .versionName(model.getVersionName())
-                .modality(model.getModality().getValue())
+                .modality(model.getModality().name())
+
                 .license(parseLicense(model.getLicense()))
                 .releaseDate(model.getReleaseDate())
                 .overview(model.getOverview())
@@ -198,7 +199,7 @@ public class ModelService {
                 .name(m.getName())
                 .uploader(m.getUploader())
                 .versionName(m.getVersionName())
-                .modality(m.getModality().getValue())
+                .modality(m.getModality().name())
                 .license(parseLicense(m.getLicense()))
                 .releaseDate(m.getReleaseDate())
                 .thumbnail(m.getThumbnail())
