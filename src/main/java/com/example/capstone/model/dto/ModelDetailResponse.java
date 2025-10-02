@@ -19,7 +19,7 @@ public class ModelDetailResponse {
     private Map<String, Object> metrics;
     private Map<String, Object> technicalSpecs;
     private String compliance;
-    private Object sample;
+    private Object samples;
     private List<Map<String,Object>> lineage;
     private List<String> releaseNotes;
     private String cidRoot;

@@ -145,7 +145,7 @@ public class ModelService {
                 .pricing(pricingMap)
                 .metrics(metrics)
                 .technicalSpecs(technicalSpecs)
-                .sample(sample)
+                .samples(sample)
                 .lineage(lineageList)
                 .releaseNotes(releaseNotesList)
                 .build();
