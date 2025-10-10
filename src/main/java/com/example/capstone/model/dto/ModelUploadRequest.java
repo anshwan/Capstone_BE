@@ -1,38 +1,37 @@
-// ModelUploadRequest.java
 package com.example.capstone.model.dto;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import jakarta.validation.constraints.NotBlank;
-import lombok.Data;
-
+import lombok.*;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.List;
 
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class ModelUploadRequest {
-
-    @NotBlank
-    private String developerWallet;
-    private String developerSignature;
-
-    @NotBlank
-    private String modelName;
+    private String name;
+    private String uploader;
     private String versionName;
     private String modality;
     private List<String> license;
+    private Map<String, Object> pricing;
 
-    private String overview;
-    private String compliance;
-    private String sampleOutput;
-    private List<String> releaseNotes;
+    private String parentModelId;
+    private String walletAddress;
     private LocalDate releaseDate;
+    private String overview;
+    private String releaseNotes;
+    private String thumbnail;
 
-    private JsonNode metrics;
-    private JsonNode pricing;
+    private Map<String, Object> metrics;
+    private Map<String, Object> technicalSpecs;
+    private Map<String, String> sample;
 
     private String cidRoot;
-    private String checksumRoot;
+    private String encryptionKey;
 
-    // 부모 모델 이름 (선택적)
-    private String parentModelName;
+    // 선택적으로 서명값 포함 가능
+    private String developerSignature;
 }

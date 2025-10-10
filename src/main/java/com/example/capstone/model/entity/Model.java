@@ -54,4 +54,8 @@ public class Model {
     /** ✅ 새로 추가 */
     @Column(name = "pda", length = 200)
     private String pda;   // 블록체인에서 반환된 PDA
+
+    @Column(name = "encryption_key", length = 512)
+    private String encryptionKey; // ✅ IPFS 암호화 키 (평문 저장, 내부 복호화용)
+
 }

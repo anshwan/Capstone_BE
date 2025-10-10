@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ModelService {
+
     private final ModelRepository modelRepository;
     private final LlmSpecsRepository llmSpecsRepository;
     private final ImageSpecsRepository imageSpecsRepository;
@@ -28,7 +29,6 @@ public class ModelService {
 
     private final BlockchainClient blockchainClient;
     private final BlockchainService blockchainService;
-
 
     /** 전체 모델 조회 */
     public List<ModelListResponse> getAllModels() {
@@ -43,8 +43,8 @@ public class ModelService {
                 .orElseThrow(() -> new IllegalArgumentException("모델을 찾을 수 없습니다. id=" + id));
 
         // 모달리티별 metrics / specs / sample
-        Map<String, Object> metrics = new HashMap<>();
-        Map<String, Object> technicalSpecs = new HashMap<>();
+        Map<String, Object> metrics = new LinkedHashMap<>();
+        Map<String, Object> technicalSpecs = new LinkedHashMap<>();
         Object sample = null;
 
         switch (model.getModality()) {
@@ -120,7 +120,7 @@ public class ModelService {
         // Pricing 조립
         Map<String, Object> pricingMap = buildPricingMap(model);
 
-        // Lineage 조립 (Lazy 초기화)
+        // Lineage 조립
         List<Map<String,Object>> lineageList = model.getLineage().stream().map(l -> {
             Map<String,Object> map = new LinkedHashMap<>();
             map.put("step", l.getStep());
@@ -130,7 +130,7 @@ public class ModelService {
             return map;
         }).collect(Collectors.toList());
 
-        // ReleaseNotes 조립 (Lazy 초기화)
+        // ReleaseNotes 조립
         List<String> releaseNotesList = model.getReleaseNotes().stream()
                 .map(ReleaseNote::getNote)
                 .toList();
@@ -142,7 +142,6 @@ public class ModelService {
                 .uploader(model.getUploader())
                 .versionName(model.getVersionName())
                 .modality(model.getModality().name())
-
                 .license(parseLicense(model.getLicense()))
                 .releaseDate(model.getReleaseDate())
                 .overview(model.getOverview())
@@ -164,7 +163,7 @@ public class ModelService {
     private ModelListResponse toListDto(Model m) {
         Map<String, Object> pricingMap = buildPricingMap(m);
 
-        Map<String, Object> metrics = new HashMap<>();
+        Map<String, Object> metrics = new LinkedHashMap<>();
         switch (m.getModality()) {
             case LLM -> {
                 LlmSpecs spec = llmSpecsRepository.findById(m.getId()).orElse(null);
@@ -219,9 +218,9 @@ public class ModelService {
 
     /** Pricing 공통 로직 */
     private Map<String, Object> buildPricingMap(Model model) {
-        Map<String, Object> pricingMap = new HashMap<>();
+        Map<String, Object> pricingMap = new LinkedHashMap<>();
         for (PricingPlan plan : model.getPricingPlans()) {
-            Map<String, Object> planMap = new HashMap<>();
+            Map<String, Object> planMap = new LinkedHashMap<>();
             planMap.put("price", plan.getPrice());
             planMap.put("description", plan.getDescription());
             planMap.put("billingType", plan.getBillingType().name().toLowerCase());
@@ -237,6 +236,7 @@ public class ModelService {
                                 .replace("\"", "")
                                 .split(","))
                         .map(String::trim)
+                        .filter(s -> !s.isBlank())
                         .toList();
                 planMap.put("rights", rightsList);
             }
@@ -259,65 +259,137 @@ public class ModelService {
                 .toList();
     }
 
+    /** 모델 업로드 */
+    @Transactional
     public Long uploadModel(ModelUploadRequest req) {
-        // 부모모델 PDA 찾기 (DB에서 부모모델 이름으로 조회)
+
+        // ✅ 부모 모델 PDA 찾기 (있으면 설정)
         String parentModelPda = null;
-        if (req.getParentModelName() != null) {
-            parentModelPda = modelRepository.findByName(req.getParentModelName())
-                    .map(parent -> parent.getPda())
+        if (req.getParentModelId() != null) {
+            modelRepository.findById(Long.valueOf(req.getParentModelId()))
+                    .ifPresent(parent -> {
+                        // 캡처 변수에 대입
+                    });
+            parentModelPda = modelRepository.findById(Long.valueOf(req.getParentModelId()))
+                    .map(Model::getPda)
                     .orElse(null);
         }
 
-
-        // 블록체인 요청 DTO 생성
+        // ✅ 블록체인 등록 요청
         BlockchainRequest chainReq = BlockchainRequest.builder()
-                .developerWallet(req.getDeveloperWallet())
-                .developerSignature(req.getDeveloperSignature())
-                .modelName(req.getModelName())
+                .developerWallet(req.getWalletAddress())
+                .developerSignature(req.getDeveloperSignature()) // optional
+                .modelName(req.getName())
                 .ipfsCid(req.getCidRoot())
-                .priceLamports("100000000") // 예시로 고정값 (나중에 req.pricing에서 변환 가능)
+                .priceLamports("100000000") // TODO: pricing에서 변환
                 .royaltyBps(250)
                 .parentModelPda(parentModelPda)
                 .build();
 
-        // 블록체인 연동 (실패 시 더미 반환)
         BlockchainResponse chainRes = blockchainService.registerOnChain(chainReq);
 
-        // DB 저장
+        // ✅ Model 엔티티 저장 (encryptionKey 평문 저장 전제)
         Model model = Model.builder()
-                .name(req.getModelName())
-                .uploader(req.getDeveloperWallet())
+                .name(req.getName())
+                .uploader(req.getUploader() != null ? req.getUploader() : req.getWalletAddress())
                 .versionName(req.getVersionName())
                 .modality(Modality.valueOf(req.getModality().toUpperCase()))
-                .license(req.getLicense().toString())
+                .license(req.getLicense() != null ? req.getLicense().toString() : "[]")
                 .overview(req.getOverview())
                 .releaseDate(req.getReleaseDate())
-                .compliance(req.getCompliance())
+                .thumbnail(req.getThumbnail())
                 .cidRoot(req.getCidRoot())
-                .checksumRoot(req.getChecksumRoot())
-                .pda(chainRes.getPda())                 // ✅ 블록체인/더미 PDA
-                .onchainTx(chainRes.getTxSignature())   // ✅ 블록체인/더미 Tx
+                .encryptionKey(req.getEncryptionKey())     // <-- Model 엔티티에 필드 존재해야 함
+                .pda(chainRes.getPda())
+                .onchainTx(chainRes.getTxSignature())
                 .build();
 
         modelRepository.save(model);
+
+        // ✅ NPE 방지를 위한 맵 기본값
+        Map<String, Object> metrics = Optional.ofNullable(req.getMetrics()).orElseGet(HashMap::new);
+        Map<String, Object> tech    = Optional.ofNullable(req.getTechnicalSpecs()).orElseGet(HashMap::new);
+        Map<String, String> sample  = Optional.ofNullable(req.getSample()).orElseGet(HashMap::new);
+
+        // ✅ 모달리티별 세부 스펙 저장
+        switch (model.getModality()) {
+            case LLM -> {
+                LlmSpecs spec = LlmSpecs.builder()
+                        .model(model)
+                        .modelId(model.getId())
+                        .mmlu(getDouble(metrics.get("MMLU")))
+                        .hellaswag(getDouble(metrics.get("HellaSwag")))
+                        .arc(getDouble(metrics.get("ARC")))
+                        .truthfulqa(getDouble(metrics.get("TruthfulQA")))
+                        .gsm8k(getDouble(metrics.get("GSM8K")))
+                        .humaneval(getDouble(metrics.get("HumanEval")))
+                        .contextWindow(getString(tech.get("contextWindow")))
+                        .maxOutputTokens(getInt(tech.get("maxOutputTokens")))
+                        .sampleOutput(getString(sample.get("output")))
+                        .build();
+                llmSpecsRepository.save(spec);
+            }
+            case IMAGE_GENERATION -> {
+                ImageSpecs spec = ImageSpecs.builder()
+                        .model(model)
+                        .modelId(model.getId())
+                        .fid(getDouble(metrics.get("FID")))
+                        .inceptionScore(getDouble(metrics.get("InceptionScore")))
+                        .clipScore(getDouble(metrics.get("CLIPScore")))
+                        .promptTokens(getInt(tech.get("promptTokens")))
+                        .maxOutputResolution(getString(tech.get("maxOutputResolution")))
+                        .samplePrompt(getString(sample.get("prompt")))
+                        .sampleOutputImage(getString(sample.get("outputImage"))) // S3 URL
+                        .build();
+                imageSpecsRepository.save(spec);
+            }
+            case AUDIO -> {
+                AudioSpecs spec = AudioSpecs.builder()
+                        .model(model)
+                        .modelId(model.getId())
+                        .werKo(getDouble(metrics.get("WER_KO")))
+                        .mos(getDouble(metrics.get("MOS")))
+                        .latency(getDouble(metrics.get("Latency")))
+                        .sampleInputAudio(getString(sample.get("inputAudio")))   // S3 URL
+                        .sampleOutput(getString(sample.get("output")))
+                        .build();
+                audioSpecsRepository.save(spec);
+            }
+            case MULTIMODAL -> {
+                MultimodalSpecs spec = MultimodalSpecs.builder()
+                        .model(model)
+                        .modelId(model.getId())
+                        .mme(getDouble(metrics.get("MME")))
+                        .ocrF1(getDouble(metrics.get("OCR_F1")))
+                        .vqav2(getDouble(metrics.get("VQAv2")))
+                        .samplePrompt(getString(sample.get("prompt")))
+                        .sampleInputImage(getString(sample.get("inputImage")))   // S3 URL
+                        .sampleOutput(getString(sample.get("output")))
+                        .build();
+                multimodalSpecsRepository.save(spec);
+            }
+        }
+
         return model.getId();
     }
 
-    private ModelDetailResponse toDetailResponse(Model model) {
-        return ModelDetailResponse.builder()
-                .id(model.getId())
-                .name(model.getName())
-                .uploader(model.getUploader())
-                .versionName(model.getVersionName())
-                .modality(model.getModality().name())
-                .license(List.of(model.getLicense().split(",")))
-                .releaseDate(model.getReleaseDate())
-                .overview(model.getOverview())
-                .cidRoot(model.getCidRoot())
-                .checksumRoot(model.getChecksumRoot())
-                .onchainTx(model.getOnchainTx())
-                .thumbnail(model.getThumbnail())
-                .build();
+    /* -------- 변환 유틸 -------- */
+
+    private Double getDouble(Object obj) {
+        if (obj == null) return null;
+        if (obj instanceof Number n) return n.doubleValue();
+        try { return Double.parseDouble(obj.toString()); } catch (Exception e) { return null; }
     }
 
+    private Integer getInt(Object obj) {
+        if (obj == null) return null;
+        if (obj instanceof Number n) return n.intValue();
+        try { return Integer.parseInt(obj.toString()); } catch (Exception e) { return null; }
+    }
+
+    private String getString(Object obj) {
+        if (obj == null) return null;
+        String s = obj.toString();
+        return s.isBlank() ? null : s;
+    }
 }
