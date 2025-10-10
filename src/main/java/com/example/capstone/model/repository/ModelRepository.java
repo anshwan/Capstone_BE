@@ -14,4 +14,5 @@ public interface ModelRepository extends JpaRepository<Model, Long> {
     @EntityGraph(attributePaths = {"pricingPlans"})
     @Query("select m from Model m where m.id = :id")
     Optional<Model> findDetailById(@Param("id") Long id);
+    Optional<Model> findByName(String name);
 }

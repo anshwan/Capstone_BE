@@ -50,4 +50,8 @@ public class Model {
 
     @OneToMany(mappedBy = "model", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Lineage> lineage;
+
+    /** ✅ 새로 추가 */
+    @Column(name = "pda", length = 200)
+    private String pda;   // 블록체인에서 반환된 PDA
 }

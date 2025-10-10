@@ -1,7 +1,12 @@
 package com.example.capstone.model.service;
 
+import com.example.capstone.blockchain.client.BlockchainClient;
+import com.example.capstone.blockchain.dto.BlockchainRequest;
+import com.example.capstone.blockchain.dto.BlockchainResponse;
+import com.example.capstone.blockchain.service.BlockchainService;
 import com.example.capstone.model.dto.ModelDetailResponse;
 import com.example.capstone.model.dto.ModelListResponse;
+import com.example.capstone.model.dto.ModelUploadRequest;
 import com.example.capstone.model.entity.*;
 import com.example.capstone.model.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +25,10 @@ public class ModelService {
     private final ImageSpecsRepository imageSpecsRepository;
     private final AudioSpecsRepository audioSpecsRepository;
     private final MultimodalSpecsRepository multimodalSpecsRepository;
+
+    private final BlockchainClient blockchainClient;
+    private final BlockchainService blockchainService;
+
 
     /** 전체 모델 조회 */
     public List<ModelListResponse> getAllModels() {
@@ -249,4 +258,66 @@ public class ModelService {
                 .filter(s -> !s.isEmpty())
                 .toList();
     }
+
+    public Long uploadModel(ModelUploadRequest req) {
+        // 부모모델 PDA 찾기 (DB에서 부모모델 이름으로 조회)
+        String parentModelPda = null;
+        if (req.getParentModelName() != null) {
+            parentModelPda = modelRepository.findByName(req.getParentModelName())
+                    .map(parent -> parent.getPda())
+                    .orElse(null);
+        }
+
+
+        // 블록체인 요청 DTO 생성
+        BlockchainRequest chainReq = BlockchainRequest.builder()
+                .developerWallet(req.getDeveloperWallet())
+                .developerSignature(req.getDeveloperSignature())
+                .modelName(req.getModelName())
+                .ipfsCid(req.getCidRoot())
+                .priceLamports("100000000") // 예시로 고정값 (나중에 req.pricing에서 변환 가능)
+                .royaltyBps(250)
+                .parentModelPda(parentModelPda)
+                .build();
+
+        // 블록체인 연동 (실패 시 더미 반환)
+        BlockchainResponse chainRes = blockchainService.registerOnChain(chainReq);
+
+        // DB 저장
+        Model model = Model.builder()
+                .name(req.getModelName())
+                .uploader(req.getDeveloperWallet())
+                .versionName(req.getVersionName())
+                .modality(Modality.valueOf(req.getModality().toUpperCase()))
+                .license(req.getLicense().toString())
+                .overview(req.getOverview())
+                .releaseDate(req.getReleaseDate())
+                .compliance(req.getCompliance())
+                .cidRoot(req.getCidRoot())
+                .checksumRoot(req.getChecksumRoot())
+                .pda(chainRes.getPda())                 // ✅ 블록체인/더미 PDA
+                .onchainTx(chainRes.getTxSignature())   // ✅ 블록체인/더미 Tx
+                .build();
+
+        modelRepository.save(model);
+        return model.getId();
+    }
+
+    private ModelDetailResponse toDetailResponse(Model model) {
+        return ModelDetailResponse.builder()
+                .id(model.getId())
+                .name(model.getName())
+                .uploader(model.getUploader())
+                .versionName(model.getVersionName())
+                .modality(model.getModality().name())
+                .license(List.of(model.getLicense().split(",")))
+                .releaseDate(model.getReleaseDate())
+                .overview(model.getOverview())
+                .cidRoot(model.getCidRoot())
+                .checksumRoot(model.getChecksumRoot())
+                .onchainTx(model.getOnchainTx())
+                .thumbnail(model.getThumbnail())
+                .build();
+    }
+
 }
