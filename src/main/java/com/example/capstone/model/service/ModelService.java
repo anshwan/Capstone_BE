@@ -9,6 +9,7 @@ import com.example.capstone.model.dto.ModelListResponse;
 import com.example.capstone.model.dto.ModelUploadRequest;
 import com.example.capstone.model.entity.*;
 import com.example.capstone.model.repository.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,8 @@ public class ModelService {
 
     private final BlockchainClient blockchainClient;
     private final BlockchainService blockchainService;
+
+    private final ObjectMapper objectMapper = new ObjectMapper(); // ✅ 추가
 
     /** 전체 모델 조회 */
     public List<ModelListResponse> getAllModels() {
@@ -117,12 +120,10 @@ public class ModelService {
             }
         }
 
-        // Pricing 조립
         Map<String, Object> pricingMap = buildPricingMap(model);
 
-        // Lineage 조립
-        List<Map<String,Object>> lineageList = model.getLineage().stream().map(l -> {
-            Map<String,Object> map = new LinkedHashMap<>();
+        List<Map<String, Object>> lineageList = model.getLineage().stream().map(l -> {
+            Map<String, Object> map = new LinkedHashMap<>();
             map.put("step", l.getStep());
             map.put("from", l.getFromModel());
             map.put("to", l.getToModel());
@@ -130,12 +131,10 @@ public class ModelService {
             return map;
         }).collect(Collectors.toList());
 
-        // ReleaseNotes 조립
         List<String> releaseNotesList = model.getReleaseNotes().stream()
                 .map(ReleaseNote::getNote)
                 .toList();
 
-        // 최종 DTO
         return ModelDetailResponse.builder()
                 .id(model.getId())
                 .name(model.getName())
@@ -216,7 +215,6 @@ public class ModelService {
                 .build();
     }
 
-    /** Pricing 공통 로직 */
     private Map<String, Object> buildPricingMap(Model model) {
         Map<String, Object> pricingMap = new LinkedHashMap<>();
         for (PricingPlan plan : model.getPricingPlans()) {
@@ -246,7 +244,6 @@ public class ModelService {
         return pricingMap;
     }
 
-    /** License 문자열 파싱 */
     private List<String> parseLicense(String licenseStr) {
         if (licenseStr == null) return List.of();
         return Arrays.stream(licenseStr
@@ -259,59 +256,60 @@ public class ModelService {
                 .toList();
     }
 
-    /** 모델 업로드 */
+    /** ✅ 수정된 모델 업로드 */
     @Transactional
     public Long uploadModel(ModelUploadRequest req) {
 
-        // ✅ 부모 모델 PDA 찾기 (있으면 설정)
         String parentModelPda = null;
         if (req.getParentModelId() != null) {
-            modelRepository.findById(Long.valueOf(req.getParentModelId()))
-                    .ifPresent(parent -> {
-                        // 캡처 변수에 대입
-                    });
             parentModelPda = modelRepository.findById(Long.valueOf(req.getParentModelId()))
                     .map(Model::getPda)
                     .orElse(null);
         }
 
-        // ✅ 블록체인 등록 요청
         BlockchainRequest chainReq = BlockchainRequest.builder()
                 .developerWallet(req.getWalletAddress())
-                .developerSignature(req.getDeveloperSignature()) // optional
+                .developerSignature(req.getDeveloperSignature())
                 .modelName(req.getName())
                 .ipfsCid(req.getCidRoot())
-                .priceLamports("100000000") // TODO: pricing에서 변환
+                .priceLamports("100000000")
                 .royaltyBps(250)
                 .parentModelPda(parentModelPda)
                 .build();
 
         BlockchainResponse chainRes = blockchainService.registerOnChain(chainReq);
 
-        // ✅ Model 엔티티 저장 (encryptionKey 평문 저장 전제)
+        // ✅ license 리스트를 JSON 문자열로 직렬화
+        String licenseJson = "[]";
+        try {
+            if (req.getLicense() != null && !req.getLicense().isEmpty()) {
+                licenseJson = objectMapper.writeValueAsString(req.getLicense());
+            }
+        } catch (Exception e) {
+            licenseJson = "[]"; // 직렬화 실패 시 fallback
+        }
+
         Model model = Model.builder()
                 .name(req.getName())
                 .uploader(req.getUploader() != null ? req.getUploader() : req.getWalletAddress())
                 .versionName(req.getVersionName())
                 .modality(Modality.valueOf(req.getModality().toUpperCase()))
-                .license(req.getLicense() != null ? req.getLicense().toString() : "[]")
+                .license(licenseJson) // ✅ JSON 문자열로 저장
                 .overview(req.getOverview())
                 .releaseDate(req.getReleaseDate())
                 .thumbnail(req.getThumbnail())
                 .cidRoot(req.getCidRoot())
-                .encryptionKey(req.getEncryptionKey())     // <-- Model 엔티티에 필드 존재해야 함
+                .encryptionKey(req.getEncryptionKey())
                 .pda(chainRes.getPda())
                 .onchainTx(chainRes.getTxSignature())
                 .build();
 
         modelRepository.save(model);
 
-        // ✅ NPE 방지를 위한 맵 기본값
         Map<String, Object> metrics = Optional.ofNullable(req.getMetrics()).orElseGet(HashMap::new);
-        Map<String, Object> tech    = Optional.ofNullable(req.getTechnicalSpecs()).orElseGet(HashMap::new);
-        Map<String, String> sample  = Optional.ofNullable(req.getSample()).orElseGet(HashMap::new);
+        Map<String, Object> tech = Optional.ofNullable(req.getTechnicalSpecs()).orElseGet(HashMap::new);
+        Map<String, String> sample = Optional.ofNullable(req.getSample()).orElseGet(HashMap::new);
 
-        // ✅ 모달리티별 세부 스펙 저장
         switch (model.getModality()) {
             case LLM -> {
                 LlmSpecs spec = LlmSpecs.builder()
@@ -339,7 +337,7 @@ public class ModelService {
                         .promptTokens(getInt(tech.get("promptTokens")))
                         .maxOutputResolution(getString(tech.get("maxOutputResolution")))
                         .samplePrompt(getString(sample.get("prompt")))
-                        .sampleOutputImage(getString(sample.get("outputImage"))) // S3 URL
+                        .sampleOutputImage(getString(sample.get("outputImage")))
                         .build();
                 imageSpecsRepository.save(spec);
             }
@@ -350,7 +348,7 @@ public class ModelService {
                         .werKo(getDouble(metrics.get("WER_KO")))
                         .mos(getDouble(metrics.get("MOS")))
                         .latency(getDouble(metrics.get("Latency")))
-                        .sampleInputAudio(getString(sample.get("inputAudio")))   // S3 URL
+                        .sampleInputAudio(getString(sample.get("inputAudio")))
                         .sampleOutput(getString(sample.get("output")))
                         .build();
                 audioSpecsRepository.save(spec);
@@ -363,7 +361,7 @@ public class ModelService {
                         .ocrF1(getDouble(metrics.get("OCR_F1")))
                         .vqav2(getDouble(metrics.get("VQAv2")))
                         .samplePrompt(getString(sample.get("prompt")))
-                        .sampleInputImage(getString(sample.get("inputImage")))   // S3 URL
+                        .sampleInputImage(getString(sample.get("inputImage")))
                         .sampleOutput(getString(sample.get("output")))
                         .build();
                 multimodalSpecsRepository.save(spec);
