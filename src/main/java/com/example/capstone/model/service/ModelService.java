@@ -31,7 +31,7 @@ public class ModelService {
     private final BlockchainClient blockchainClient;
     private final BlockchainService blockchainService;
 
-    private final ObjectMapper objectMapper = new ObjectMapper(); // ✅ 추가
+    private final ObjectMapper objectMapper = new ObjectMapper(); // JSON 직렬화용
 
     /** 전체 모델 조회 */
     public List<ModelListResponse> getAllModels() {
@@ -260,6 +260,7 @@ public class ModelService {
     @Transactional
     public Long uploadModel(ModelUploadRequest req) {
 
+        // 부모 모델 PDA
         String parentModelPda = null;
         if (req.getParentModelId() != null) {
             parentModelPda = modelRepository.findById(Long.valueOf(req.getParentModelId()))
@@ -267,6 +268,7 @@ public class ModelService {
                     .orElse(null);
         }
 
+        // 온체인 등록
         BlockchainRequest chainReq = BlockchainRequest.builder()
                 .developerWallet(req.getWalletAddress())
                 .developerSignature(req.getDeveloperSignature())
@@ -279,22 +281,23 @@ public class ModelService {
 
         BlockchainResponse chainRes = blockchainService.registerOnChain(chainReq);
 
-        // ✅ license 리스트를 JSON 문자열로 직렬화
+        // license(JSON) 직렬화
         String licenseJson = "[]";
         try {
             if (req.getLicense() != null && !req.getLicense().isEmpty()) {
                 licenseJson = objectMapper.writeValueAsString(req.getLicense());
             }
         } catch (Exception e) {
-            licenseJson = "[]"; // 직렬화 실패 시 fallback
+            licenseJson = "[]";
         }
 
+        // Model 저장 (ID 확정 위해 즉시 flush)
         Model model = Model.builder()
                 .name(req.getName())
                 .uploader(req.getUploader() != null ? req.getUploader() : req.getWalletAddress())
                 .versionName(req.getVersionName())
                 .modality(Modality.valueOf(req.getModality().toUpperCase()))
-                .license(licenseJson) // ✅ JSON 문자열로 저장
+                .license(licenseJson)
                 .overview(req.getOverview())
                 .releaseDate(req.getReleaseDate())
                 .thumbnail(req.getThumbnail())
@@ -304,17 +307,18 @@ public class ModelService {
                 .onchainTx(chainRes.getTxSignature())
                 .build();
 
-        modelRepository.save(model);
+        modelRepository.saveAndFlush(model); // ✅ 핵심: flush로 ID 바로 확정
 
+        // NPE 방지 기본값
         Map<String, Object> metrics = Optional.ofNullable(req.getMetrics()).orElseGet(HashMap::new);
-        Map<String, Object> tech = Optional.ofNullable(req.getTechnicalSpecs()).orElseGet(HashMap::new);
-        Map<String, String> sample = Optional.ofNullable(req.getSample()).orElseGet(HashMap::new);
+        Map<String, Object> tech    = Optional.ofNullable(req.getTechnicalSpecs()).orElseGet(HashMap::new);
+        Map<String, String> sample  = Optional.ofNullable(req.getSample()).orElseGet(HashMap::new);
 
+        // 모달리티별 세부 스펙 저장 (@MapsId → model만 설정, modelId 수동 세팅 금지)
         switch (model.getModality()) {
             case LLM -> {
                 LlmSpecs spec = LlmSpecs.builder()
-                        .model(model)
-                        .modelId(model.getId())
+                        .model(model) // ✅ model 지정만 하면 model_id가 PK로 자동 매핑됨
                         .mmlu(getDouble(metrics.get("MMLU")))
                         .hellaswag(getDouble(metrics.get("HellaSwag")))
                         .arc(getDouble(metrics.get("ARC")))
@@ -329,8 +333,7 @@ public class ModelService {
             }
             case IMAGE_GENERATION -> {
                 ImageSpecs spec = ImageSpecs.builder()
-                        .model(model)
-                        .modelId(model.getId())
+                        .model(model) // ✅
                         .fid(getDouble(metrics.get("FID")))
                         .inceptionScore(getDouble(metrics.get("InceptionScore")))
                         .clipScore(getDouble(metrics.get("CLIPScore")))
@@ -343,11 +346,13 @@ public class ModelService {
             }
             case AUDIO -> {
                 AudioSpecs spec = AudioSpecs.builder()
-                        .model(model)
-                        .modelId(model.getId())
+                        .model(model) // ✅
                         .werKo(getDouble(metrics.get("WER_KO")))
                         .mos(getDouble(metrics.get("MOS")))
                         .latency(getDouble(metrics.get("Latency")))
+                        .maxAudioInput(getString(tech.get("maxAudioInput")))     // ✅ 누락 필드 보완
+                        .maxAudioOutput(getString(tech.get("maxAudioOutput")))   // ✅
+                        .sampleRate(getString(tech.get("sampleRate")))           // ✅
                         .sampleInputAudio(getString(sample.get("inputAudio")))
                         .sampleOutput(getString(sample.get("output")))
                         .build();
@@ -355,13 +360,15 @@ public class ModelService {
             }
             case MULTIMODAL -> {
                 MultimodalSpecs spec = MultimodalSpecs.builder()
-                        .model(model)
-                        .modelId(model.getId())
+                        .model(model) // ✅
                         .mme(getDouble(metrics.get("MME")))
                         .ocrF1(getDouble(metrics.get("OCR_F1")))
                         .vqav2(getDouble(metrics.get("VQAv2")))
-                        .samplePrompt(getString(sample.get("prompt")))
+                        .textTokens(getString(tech.get("textTokens")))                // ✅ 누락 필드 보완
+                        .maxImages(getInt(tech.get("maxImages")))                      // ✅
+                        .maxImageResolution(getString(tech.get("maxImageResolution"))) // ✅
                         .sampleInputImage(getString(sample.get("inputImage")))
+                        .samplePrompt(getString(sample.get("prompt")))
                         .sampleOutput(getString(sample.get("output")))
                         .build();
                 multimodalSpecsRepository.save(spec);
