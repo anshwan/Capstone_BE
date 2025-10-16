@@ -22,19 +22,47 @@ public class PaymentService {
      * 프론트 요청 예시:
      * {
      *   "id": 1,
-     *   "buyer": "openai_official",
-     *   "plan": "standard",
-     *   "price": 20,
-     *   "onchainTx": "0x1a2b3c..."
+     *   "buyer": "안승환",
+     *   "plan": "standard",   // ✅ 추가: 사용자가 선택한 플랜
+     *   "pricing": {
+     *     "research": { "price": 5, "description": "연구용", "billingType": "free" },
+     *     "standard": { "price": 20, "description": "표준", "billingType": "monthly_subscription" },
+     *     "enterprise": { "price": 100, "description": "기업용", "billingType": "one_time_purchase" }
+     *   },
+     *   "onchainTx": "0x1a2b3c4d..."
      * }
      */
     @Transactional
     public PaymentResponse verifyAndCreateReceipt(PaymentRequest req) {
         String txHash = req.getOnchainTx();
         String buyerWallet = req.getBuyer();
-        String plan = req.getPlan().toUpperCase(); // STANDARD / RESEARCH / ENTERPRISE
-        Long amountLamports = req.getPrice();
+        String plan = req.getPlan() != null ? req.getPlan().toUpperCase() : "STANDARD"; // 기본값
         Long modelId = req.getId();
+
+        // ✅ 선택된 플랜의 결제 금액 추출
+        Long amountLamports = null;
+        try {
+            switch (plan) {
+                case "RESEARCH" -> {
+                    if (req.getPricing().getResearch() != null)
+                        amountLamports = req.getPricing().getResearch().getPrice();
+                }
+                case "ENTERPRISE" -> {
+                    if (req.getPricing().getEnterprise() != null)
+                        amountLamports = req.getPricing().getEnterprise().getPrice();
+                }
+                default -> {
+                    if (req.getPricing().getStandard() != null)
+                        amountLamports = req.getPricing().getStandard().getPrice();
+                }
+            }
+        } catch (Exception e) {
+            throw new IllegalArgumentException("요금제 정보가 올바르지 않습니다: " + e.getMessage());
+        }
+
+        if (amountLamports == null) {
+            throw new IllegalArgumentException("선택된 플랜(" + plan + ")의 결제 금액을 찾을 수 없습니다.");
+        }
 
         // 1️⃣ 중복 트랜잭션 방지
         receiptRepository.findByOnchainTxHash(txHash)
@@ -51,7 +79,7 @@ public class PaymentService {
                 .onchainTxHash(txHash)
                 .status(Receipt.Status.PENDING)
                 .build();
-        receiptRepository.saveAndFlush(receipt); // flush로 즉시 DB 반영
+        receiptRepository.saveAndFlush(receipt);
 
         // 3️⃣ 온체인 검증 요청
         try {
@@ -68,7 +96,7 @@ public class PaymentService {
                 receipt.setReceiptPda(result.getSubscriptionReceiptPDA());
                 System.out.println("✅ 결제 검증 성공: txHash=" + result.getTransactionHash());
             } else {
-                // ❌ 블록체인 서버에서 실패 반환
+                // ❌ 블록체인 서버 응답 실패
                 receipt.setStatus(Receipt.Status.FAILED);
                 System.err.println("❌ 결제 검증 실패: txHash=" + txHash);
             }
