@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -14,6 +15,7 @@ public class BlockchainService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
+    /** 🔹 기존 모델 등록 요청 */
     public BlockchainResponse registerOnChain(BlockchainRequest request) {
         try {
             String url = "http://localhost:4000/register_model"; // 블록체인 백엔드 API
@@ -28,5 +30,44 @@ public class BlockchainService {
             dummy.setStatus("DUMMY_SUCCESS");
             return dummy;
         }
+    }
+
+    /** 🔹 새로 추가: 결제 검증 요청 */
+    public VerifyPurchaseResult verifyPurchase(String txHash,
+                                               String buyerWallet,
+                                               long amountLamports,
+                                               String plan) {
+        try {
+            // 블록체인 백엔드 결제 검증 API
+            String url = "http://localhost:4000/verify_purchase";
+
+            Map<String, Object> body = Map.of(
+                    "txHash", txHash,
+                    "buyerWallet", buyerWallet,
+                    "amountLamports", amountLamports,
+                    "plan", plan
+            );
+
+            // 응답은 예: {"success":true,"transactionHash":"...","subscriptionReceiptPDA":"..."}
+            Map<?, ?> response = restTemplate.postForObject(url, body, Map.class);
+
+            boolean success = Boolean.TRUE.equals(response.get("success"));
+            String transactionHash = (String) response.get("transactionHash");
+            String receiptPda = (String) response.get("subscriptionReceiptPDA");
+
+            return new VerifyPurchaseResult(success, transactionHash, receiptPda);
+
+        } catch (Exception e) {
+            System.err.println("⚠️ 결제 검증 실패: " + e.getMessage());
+            return new VerifyPurchaseResult(false, "dummy_tx_" + UUID.randomUUID(), null);
+        }
+    }
+
+    /** 🔹 내부 응답 객체 (PaymentService와 연동용) */
+    @lombok.Value
+    public static class VerifyPurchaseResult {
+        boolean success;
+        String transactionHash;
+        String subscriptionReceiptPDA;
     }
 }
