@@ -251,7 +251,6 @@ public class ModelService {
     /** ✅ 업로드 (엔티티 구조 반영 버전) */
     @Transactional
     public Long uploadModel(ModelUploadRequest req) {
-        // lineage 정보
         String parentModelId = req.getLineage() != null ? req.getLineage().getParentModelId() : null;
         String relationship = req.getLineage() != null ? req.getLineage().getRelationship() : null;
 
@@ -296,7 +295,6 @@ public class ModelService {
                 .build();
         modelRepository.saveAndFlush(model);
 
-        // lineage 저장
         if (parentModelId != null || relationship != null) {
             String fromModel = modelRepository.findById(Long.valueOf(parentModelId))
                     .map(Model::getName).orElse(null);
@@ -320,7 +318,6 @@ public class ModelService {
                     .build());
         }
 
-        // release note
         if (req.getReleaseNotes() != null) {
             releaseNoteRepository.save(ReleaseNote.builder()
                     .model(model)
@@ -328,13 +325,13 @@ public class ModelService {
                     .build());
         }
 
-        // pricing plan
+        // ✅ PlanType 대소문자 무시하도록 수정
         if (req.getPricing() != null) {
             for (Map.Entry<String, Object> entry : req.getPricing().entrySet()) {
                 Map<String, Object> plan = (Map<String, Object>) entry.getValue();
                 pricingPlanRepository.save(PricingPlan.builder()
                         .model(model)
-                        .planType(PlanType.valueOf(entry.getKey().toUpperCase()))
+                        .planType(PlanType.valueOf(entry.getKey().trim().toLowerCase()))
                         .price(getDouble(plan.get("price")))
                         .description(getString(plan.get("description")))
                         .billingType(BillingType.valueOf(getString(plan.get("billingType")).toUpperCase()))
@@ -346,7 +343,6 @@ public class ModelService {
             }
         }
 
-        // specs 저장
         switch (req.getModality().toLowerCase()) {
             case "llm" -> llmSpecsRepository.save(LlmSpecs.of(
                     model,
@@ -398,7 +394,6 @@ public class ModelService {
         return model.getId();
     }
 
-    /* -------- 변환 유틸 -------- */
     private String writeJson(Object obj) {
         if (obj == null) return "[]";
         try { return objectMapper.writeValueAsString(obj); }
