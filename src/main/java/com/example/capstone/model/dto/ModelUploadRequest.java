@@ -11,6 +11,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class ModelUploadRequest {
+
     private String name;
     private String uploader;
     private String versionName;
@@ -18,7 +19,6 @@ public class ModelUploadRequest {
     private List<String> license;
     private Map<String, Object> pricing;
 
-    private String parentModelId;
     private String walletAddress;
     private LocalDate releaseDate;
     private String overview;
@@ -32,6 +32,19 @@ public class ModelUploadRequest {
     private String cidRoot;
     private String encryptionKey;
 
-    // 선택적으로 서명값 포함 가능
+    // ✅ lineage: 프론트에서 전송되는 계보 정보
+    private Lineage lineage;
+
+    // ✅ 선택적 서명
     private String developerSignature;
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class Lineage {
+        private String parentModelId;   // "123"
+        private String relationship;    // "fine-tuned-from"
+    }
 }

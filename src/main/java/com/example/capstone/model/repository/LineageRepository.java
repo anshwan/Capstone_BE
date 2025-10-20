@@ -2,7 +2,13 @@ package com.example.capstone.model.repository;
 
 import com.example.capstone.model.entity.Lineage;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface LineageRepository extends JpaRepository<Lineage, Long> {}
+public interface LineageRepository extends JpaRepository<Lineage, Long> {
+
+    // ✅ 모델별 현재 최대 step 조회
+    @Query("SELECT MAX(l.step) FROM Lineage l WHERE l.model.id = :modelId")
+    Integer findMaxStepByModelId(Long modelId);
+}

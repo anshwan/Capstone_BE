@@ -27,6 +27,7 @@ public class ModelService {
     private final ImageSpecsRepository imageSpecsRepository;
     private final AudioSpecsRepository audioSpecsRepository;
     private final MultimodalSpecsRepository multimodalSpecsRepository;
+    private final LineageRepository lineageRepository; // ✅ 추가
 
     private final BlockchainClient blockchainClient;
     private final BlockchainService blockchainService;
@@ -45,7 +46,6 @@ public class ModelService {
         Model model = modelRepository.findDetailById(id)
                 .orElseThrow(() -> new IllegalArgumentException("모델을 찾을 수 없습니다. id=" + id));
 
-        // 모달리티별 metrics / specs / sample
         Map<String, Object> metrics = new LinkedHashMap<>();
         Map<String, Object> technicalSpecs = new LinkedHashMap<>();
         Object sample = null;
@@ -60,10 +60,8 @@ public class ModelService {
                     metrics.put("TruthfulQA", spec.getTruthfulqa());
                     metrics.put("GSM8K", spec.getGsm8k());
                     metrics.put("HumanEval", spec.getHumaneval());
-
                     technicalSpecs.put("contextWindow", spec.getContextWindow());
                     technicalSpecs.put("maxOutputTokens", spec.getMaxOutputTokens());
-
                     sample = spec.getSampleOutput();
                 }
             }
@@ -73,10 +71,8 @@ public class ModelService {
                     metrics.put("FID", spec.getFid());
                     metrics.put("InceptionScore", spec.getInceptionScore());
                     metrics.put("CLIPScore", spec.getClipScore());
-
                     technicalSpecs.put("promptTokens", spec.getPromptTokens());
                     technicalSpecs.put("maxOutputResolution", spec.getMaxOutputResolution());
-
                     sample = Map.of(
                             "prompt", spec.getSamplePrompt(),
                             "outputImage", spec.getSampleOutputImage()
@@ -89,11 +85,9 @@ public class ModelService {
                     metrics.put("WER_KO", spec.getWerKo());
                     metrics.put("MOS", spec.getMos());
                     metrics.put("Latency", spec.getLatency());
-
                     technicalSpecs.put("maxAudioInput", spec.getMaxAudioInput());
                     technicalSpecs.put("maxAudioOutput", spec.getMaxAudioOutput());
                     technicalSpecs.put("sampleRate", spec.getSampleRate());
-
                     sample = Map.of(
                             "inputAudio", spec.getSampleInputAudio(),
                             "output", spec.getSampleOutput()
@@ -106,11 +100,9 @@ public class ModelService {
                     metrics.put("MME", spec.getMme());
                     metrics.put("OCR_F1", spec.getOcrF1());
                     metrics.put("VQAv2", spec.getVqav2());
-
                     technicalSpecs.put("textTokens", spec.getTextTokens());
                     technicalSpecs.put("maxImages", spec.getMaxImages());
                     technicalSpecs.put("maxImageResolution", spec.getMaxImageResolution());
-
                     sample = Map.of(
                             "inputImage", spec.getSampleInputImage(),
                             "prompt", spec.getSamplePrompt(),
@@ -158,7 +150,6 @@ public class ModelService {
                 .build();
     }
 
-    /** 리스트용 DTO (pricing + metrics 포함) */
     private ModelListResponse toListDto(Model m) {
         Map<String, Object> pricingMap = buildPricingMap(m);
 
@@ -260,10 +251,18 @@ public class ModelService {
     @Transactional
     public Long uploadModel(ModelUploadRequest req) {
 
-        // 부모 모델 PDA
+        // ✅ lineage 정보 파싱
+        String parentModelId = null;
+        String relationship = null;
+        if (req.getLineage() != null) {
+            parentModelId = req.getLineage().getParentModelId();
+            relationship = req.getLineage().getRelationship();
+        }
+
+        // 부모 모델 PDA 조회
         String parentModelPda = null;
-        if (req.getParentModelId() != null) {
-            parentModelPda = modelRepository.findById(Long.valueOf(req.getParentModelId()))
+        if (parentModelId != null) {
+            parentModelPda = modelRepository.findById(Long.valueOf(parentModelId))
                     .map(Model::getPda)
                     .orElse(null);
         }
@@ -291,7 +290,7 @@ public class ModelService {
             licenseJson = "[]";
         }
 
-        // Model 저장 (ID 확정 위해 즉시 flush)
+        // 모델 저장
         Model model = Model.builder()
                 .name(req.getName())
                 .uploader(req.getUploader() != null ? req.getUploader() : req.getWalletAddress())
@@ -307,72 +306,33 @@ public class ModelService {
                 .onchainTx(chainRes.getTxSignature())
                 .build();
 
-        modelRepository.saveAndFlush(model); // ✅ 핵심: flush로 ID 바로 확정
+        modelRepository.saveAndFlush(model);
 
-        // NPE 방지 기본값
-        Map<String, Object> metrics = Optional.ofNullable(req.getMetrics()).orElseGet(HashMap::new);
-        Map<String, Object> tech    = Optional.ofNullable(req.getTechnicalSpecs()).orElseGet(HashMap::new);
-        Map<String, String> sample  = Optional.ofNullable(req.getSample()).orElseGet(HashMap::new);
+        // lineage 저장
+        if (parentModelId != null || relationship != null) {
+            String fromModel = modelRepository.findById(Long.valueOf(parentModelId))
+                    .map(Model::getName).orElse(null);
 
-        // 모달리티별 세부 스펙 저장 (@MapsId → model만 설정, modelId 수동 세팅 금지)
-        switch (model.getModality()) {
-            case LLM -> {
-                LlmSpecs spec = LlmSpecs.builder()
-                        .model(model) // ✅ model 지정만 하면 model_id가 PK로 자동 매핑됨
-                        .mmlu(getDouble(metrics.get("MMLU")))
-                        .hellaswag(getDouble(metrics.get("HellaSwag")))
-                        .arc(getDouble(metrics.get("ARC")))
-                        .truthfulqa(getDouble(metrics.get("TruthfulQA")))
-                        .gsm8k(getDouble(metrics.get("GSM8K")))
-                        .humaneval(getDouble(metrics.get("HumanEval")))
-                        .contextWindow(getString(tech.get("contextWindow")))
-                        .maxOutputTokens(getInt(tech.get("maxOutputTokens")))
-                        .sampleOutput(getString(sample.get("output")))
-                        .build();
-                llmSpecsRepository.save(spec);
+            Relationship relationEnum;
+            try {
+                relationEnum = Relationship.valueOf(relationship.trim().toLowerCase().replace("-", "_"));
+            } catch (Exception e) {
+                relationEnum = Relationship.iteration;
             }
-            case IMAGE_GENERATION -> {
-                ImageSpecs spec = ImageSpecs.builder()
-                        .model(model) // ✅
-                        .fid(getDouble(metrics.get("FID")))
-                        .inceptionScore(getDouble(metrics.get("InceptionScore")))
-                        .clipScore(getDouble(metrics.get("CLIPScore")))
-                        .promptTokens(getInt(tech.get("promptTokens")))
-                        .maxOutputResolution(getString(tech.get("maxOutputResolution")))
-                        .samplePrompt(getString(sample.get("prompt")))
-                        .sampleOutputImage(getString(sample.get("outputImage")))
-                        .build();
-                imageSpecsRepository.save(spec);
-            }
-            case AUDIO -> {
-                AudioSpecs spec = AudioSpecs.builder()
-                        .model(model) // ✅
-                        .werKo(getDouble(metrics.get("WER_KO")))
-                        .mos(getDouble(metrics.get("MOS")))
-                        .latency(getDouble(metrics.get("Latency")))
-                        .maxAudioInput(getString(tech.get("maxAudioInput")))     // ✅ 누락 필드 보완
-                        .maxAudioOutput(getString(tech.get("maxAudioOutput")))   // ✅
-                        .sampleRate(getString(tech.get("sampleRate")))           // ✅
-                        .sampleInputAudio(getString(sample.get("inputAudio")))
-                        .sampleOutput(getString(sample.get("output")))
-                        .build();
-                audioSpecsRepository.save(spec);
-            }
-            case MULTIMODAL -> {
-                MultimodalSpecs spec = MultimodalSpecs.builder()
-                        .model(model) // ✅
-                        .mme(getDouble(metrics.get("MME")))
-                        .ocrF1(getDouble(metrics.get("OCR_F1")))
-                        .vqav2(getDouble(metrics.get("VQAv2")))
-                        .textTokens(getString(tech.get("textTokens")))                // ✅ 누락 필드 보완
-                        .maxImages(getInt(tech.get("maxImages")))                      // ✅
-                        .maxImageResolution(getString(tech.get("maxImageResolution"))) // ✅
-                        .sampleInputImage(getString(sample.get("inputImage")))
-                        .samplePrompt(getString(sample.get("prompt")))
-                        .sampleOutput(getString(sample.get("output")))
-                        .build();
-                multimodalSpecsRepository.save(spec);
-            }
+
+
+            Integer currentMax = lineageRepository.findMaxStepByModelId(model.getId());
+            int nextStep = (currentMax == null ? 0 : currentMax) + 1;
+
+            Lineage lineage = Lineage.builder()
+                    .model(model)
+                    .step(nextStep)
+                    .fromModel(fromModel)
+                    .toModel(model.getName())
+                    .relationship(relationEnum)
+                    .build();
+
+            lineageRepository.save(lineage);
         }
 
         return model.getId();
