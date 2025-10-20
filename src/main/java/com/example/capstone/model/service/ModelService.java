@@ -248,7 +248,7 @@ public class ModelService {
                 .toList();
     }
 
-    /** ✅ 업로드 (enum 대소문자 모두 안전 처리 버전) */
+    /** ✅ 업로드 (모든 enum 대소문자 완전 대응 버전) */
     @Transactional
     public Long uploadModel(ModelUploadRequest req) {
         String parentModelId = req.getLineage() != null ? req.getLineage().getParentModelId() : null;
@@ -283,7 +283,7 @@ public class ModelService {
                 .name(req.getName())
                 .uploader(req.getUploader() != null ? req.getUploader() : req.getWalletAddress())
                 .versionName(req.getVersionName())
-                .modality(Modality.valueOf(req.getModality().trim().toLowerCase()))
+                .modality(Modality.valueOf(req.getModality().trim().toUpperCase())) // ✅ 수정됨
                 .license(licenseJson)
                 .overview(req.getOverview())
                 .releaseDate(req.getReleaseDate())
@@ -342,7 +342,7 @@ public class ModelService {
             }
         }
 
-        // metrics & specs
+        // ✅ metrics & specs
         switch (req.getModality().trim().toLowerCase()) {
             case "llm" -> llmSpecsRepository.save(LlmSpecs.of(
                     model,
