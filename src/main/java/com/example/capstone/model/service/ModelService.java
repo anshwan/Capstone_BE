@@ -248,7 +248,7 @@ public class ModelService {
                 .toList();
     }
 
-    /** ✅ 업로드 (엔티티 구조 반영 버전) */
+    /** ✅ 업로드 (enum 대소문자 모두 안전 처리 버전) */
     @Transactional
     public Long uploadModel(ModelUploadRequest req) {
         String parentModelId = req.getLineage() != null ? req.getLineage().getParentModelId() : null;
@@ -283,7 +283,7 @@ public class ModelService {
                 .name(req.getName())
                 .uploader(req.getUploader() != null ? req.getUploader() : req.getWalletAddress())
                 .versionName(req.getVersionName())
-                .modality(Modality.valueOf(req.getModality().toUpperCase()))
+                .modality(Modality.valueOf(req.getModality().trim().toLowerCase()))
                 .license(licenseJson)
                 .overview(req.getOverview())
                 .releaseDate(req.getReleaseDate())
@@ -301,7 +301,7 @@ public class ModelService {
 
             Relationship relationEnum;
             try {
-                relationEnum = Relationship.valueOf(relationship.trim().toUpperCase().replace("-", "_"));
+                relationEnum = Relationship.valueOf(relationship.trim().toLowerCase().replace("-", "_"));
             } catch (Exception e) {
                 relationEnum = Relationship.iteration;
             }
@@ -325,7 +325,6 @@ public class ModelService {
                     .build());
         }
 
-        // ✅ PlanType 대소문자 무시하도록 수정
         if (req.getPricing() != null) {
             for (Map.Entry<String, Object> entry : req.getPricing().entrySet()) {
                 Map<String, Object> plan = (Map<String, Object>) entry.getValue();
@@ -334,7 +333,7 @@ public class ModelService {
                         .planType(PlanType.valueOf(entry.getKey().trim().toLowerCase()))
                         .price(getDouble(plan.get("price")))
                         .description(getString(plan.get("description")))
-                        .billingType(BillingType.valueOf(getString(plan.get("billingType")).toUpperCase()))
+                        .billingType(BillingType.valueOf(getString(plan.get("billingType")).trim().toLowerCase()))
                         .rights(writeJson(plan.get("rights")))
                         .monthlyTokenLimit(getInt(plan.get("monthlyTokenLimit")))
                         .monthlyGenerationLimit(getInt(plan.get("monthlyGenerationLimit")))
@@ -343,7 +342,8 @@ public class ModelService {
             }
         }
 
-        switch (req.getModality().toLowerCase()) {
+        // metrics & specs
+        switch (req.getModality().trim().toLowerCase()) {
             case "llm" -> llmSpecsRepository.save(LlmSpecs.of(
                     model,
                     getDouble(req.getMetrics().get("mmlu")),
