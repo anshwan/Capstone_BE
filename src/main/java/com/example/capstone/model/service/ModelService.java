@@ -248,7 +248,7 @@ public class ModelService {
                 .toList();
     }
 
-    /** ✅ 업로드 (모든 enum 대소문자 완전 대응 버전) */
+    /** ✅ 업로드 (모든 enum + metrics 대소문자 대응 버전) */
     @Transactional
     public Long uploadModel(ModelUploadRequest req) {
         String parentModelId = req.getLineage() != null ? req.getLineage().getParentModelId() : null;
@@ -283,7 +283,7 @@ public class ModelService {
                 .name(req.getName())
                 .uploader(req.getUploader() != null ? req.getUploader() : req.getWalletAddress())
                 .versionName(req.getVersionName())
-                .modality(Modality.valueOf(req.getModality().trim().toUpperCase())) // ✅ 수정됨
+                .modality(Modality.valueOf(req.getModality().trim().toUpperCase()))
                 .license(licenseJson)
                 .overview(req.getOverview())
                 .releaseDate(req.getReleaseDate())
@@ -342,25 +342,25 @@ public class ModelService {
             }
         }
 
-        // ✅ metrics & specs
+        // ✅ metrics 저장 (대소문자 무시)
         switch (req.getModality().trim().toLowerCase()) {
             case "llm" -> llmSpecsRepository.save(LlmSpecs.of(
                     model,
-                    getDouble(req.getMetrics().get("mmlu")),
-                    getDouble(req.getMetrics().get("hellaswag")),
-                    getDouble(req.getMetrics().get("arc")),
-                    getDouble(req.getMetrics().get("truthfulqa")),
-                    getDouble(req.getMetrics().get("gsm8k")),
-                    getDouble(req.getMetrics().get("humaneval")),
+                    getDouble(getMetricValue(req.getMetrics(), "mmlu")),
+                    getDouble(getMetricValue(req.getMetrics(), "hellaswag")),
+                    getDouble(getMetricValue(req.getMetrics(), "arc")),
+                    getDouble(getMetricValue(req.getMetrics(), "truthfulqa")),
+                    getDouble(getMetricValue(req.getMetrics(), "gsm8k")),
+                    getDouble(getMetricValue(req.getMetrics(), "humaneval")),
                     getString(req.getTechnicalSpecs().get("context_window")),
                     getInt(req.getTechnicalSpecs().get("max_output_tokens")),
                     getString(req.getSample().get("sample_output"))
             ));
             case "image_generation", "image" -> imageSpecsRepository.save(ImageSpecs.of(
                     model,
-                    getDouble(req.getMetrics().get("fid")),
-                    getDouble(req.getMetrics().get("inception_score")),
-                    getDouble(req.getMetrics().get("clip_score")),
+                    getDouble(getMetricValue(req.getMetrics(), "fid")),
+                    getDouble(getMetricValue(req.getMetrics(), "inception_score")),
+                    getDouble(getMetricValue(req.getMetrics(), "clip_score")),
                     getInt(req.getTechnicalSpecs().get("prompt_tokens")),
                     getString(req.getTechnicalSpecs().get("max_output_resolution")),
                     getString(req.getSample().get("sample_prompt")),
@@ -368,9 +368,9 @@ public class ModelService {
             ));
             case "audio" -> audioSpecsRepository.save(AudioSpecs.of(
                     model,
-                    getDouble(req.getMetrics().get("wer_ko")),
-                    getDouble(req.getMetrics().get("mos")),
-                    getDouble(req.getMetrics().get("latency")),
+                    getDouble(getMetricValue(req.getMetrics(), "wer_ko")),
+                    getDouble(getMetricValue(req.getMetrics(), "mos")),
+                    getDouble(getMetricValue(req.getMetrics(), "latency")),
                     getString(req.getTechnicalSpecs().get("max_audio_input")),
                     getString(req.getTechnicalSpecs().get("max_audio_output")),
                     getString(req.getTechnicalSpecs().get("sample_rate")),
@@ -379,9 +379,9 @@ public class ModelService {
             ));
             case "multimodal" -> multimodalSpecsRepository.save(MultimodalSpecs.of(
                     model,
-                    getDouble(req.getMetrics().get("mme")),
-                    getDouble(req.getMetrics().get("ocr_f1")),
-                    getDouble(req.getMetrics().get("vqav2")),
+                    getDouble(getMetricValue(req.getMetrics(), "mme")),
+                    getDouble(getMetricValue(req.getMetrics(), "ocr_f1")),
+                    getDouble(getMetricValue(req.getMetrics(), "vqav2")),
                     getString(req.getTechnicalSpecs().get("text_tokens")),
                     getInt(req.getTechnicalSpecs().get("max_images")),
                     getString(req.getTechnicalSpecs().get("max_image_resolution")),
@@ -392,6 +392,17 @@ public class ModelService {
         }
 
         return model.getId();
+    }
+
+    // ✅ metrics key 대소문자 무시
+    private Object getMetricValue(Map<String, Object> map, String key) {
+        if (map == null || key == null) return null;
+        for (String k : map.keySet()) {
+            if (k.equalsIgnoreCase(key)) {
+                return map.get(k);
+            }
+        }
+        return null;
     }
 
     private String writeJson(Object obj) {
