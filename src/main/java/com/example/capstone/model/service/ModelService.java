@@ -116,14 +116,8 @@ public class ModelService {
 
         Map<String, Object> pricingMap = buildPricingMap(model);
 
-        List<Map<String, Object>> lineageList = model.getLineage().stream().map(l -> {
-            Map<String, Object> map = new LinkedHashMap<>();
-            map.put("step", l.getStep());
-            map.put("from", l.getFromModel());
-            map.put("to", l.getToModel());
-            map.put("relationship", l.getRelationship().name().toLowerCase());
-            return map;
-        }).collect(Collectors.toList());
+        // ✅ 단일 부모 계보 전체 추적 (Claude 1 → Claude 2 → Claude 3 ...)
+        List<Map<String, Object>> lineageList = buildFullLineage(model.getName());
 
         List<String> releaseNotesList = model.getReleaseNotes().stream()
                 .map(ReleaseNote::getNote)
@@ -150,6 +144,27 @@ public class ModelService {
                 .lineage(lineageList)
                 .releaseNotes(releaseNotesList)
                 .build();
+    }
+
+    /** ✅ 계보 전체 추적용 메서드 */
+    private List<Map<String, Object>> buildFullLineage(String currentModelName) {
+        List<Map<String, Object>> lineageChain = new ArrayList<>();
+
+        lineageRepository.findByToModel(currentModelName).ifPresent(lineage -> {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("step", lineage.getStep());
+            map.put("from", lineage.getFromModel());
+            map.put("to", lineage.getToModel());
+            map.put("relationship", lineage.getRelationship().name().toLowerCase());
+            lineageChain.add(map);
+
+            if (lineage.getFromModel() != null) {
+                lineageChain.addAll(buildFullLineage(lineage.getFromModel()));
+            }
+        });
+
+        lineageChain.sort(Comparator.comparing(m -> (Integer) m.get("step")));
+        return lineageChain;
     }
 
     private ModelListResponse toListDto(Model m) {
@@ -248,9 +263,9 @@ public class ModelService {
                 .toList();
     }
 
-    /** ✅ 업로드 (모든 enum + metrics 대소문자 대응 버전) */
     @Transactional
     public Long uploadModel(ModelUploadRequest req) {
+        // ⚙️ (Lady T의 기존 코드 그대로 유지 — 생략 없이 그대로 둠)
         String parentModelId = req.getLineage() != null ? req.getLineage().getParentModelId() : null;
         String relationship = req.getLineage() != null ? req.getLineage().getRelationship() : null;
 
@@ -342,7 +357,7 @@ public class ModelService {
             }
         }
 
-        // ✅ metrics 저장 (대소문자 무시)
+        // ✅ metrics 저장 (Lady T의 기존 코드 그대로 유지)
         switch (req.getModality().trim().toLowerCase()) {
             case "llm" -> llmSpecsRepository.save(LlmSpecs.of(
                     model,
@@ -394,7 +409,6 @@ public class ModelService {
         return model.getId();
     }
 
-    // ✅ metrics key 대소문자 무시
     private Object getMetricValue(Map<String, Object> map, String key) {
         if (map == null || key == null) return null;
         for (String k : map.keySet()) {
