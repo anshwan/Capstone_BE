@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
@@ -35,7 +37,7 @@ public class PaymentService {
     @Transactional
     public PaymentResponse verifyAndCreateReceipt(PaymentRequest req) {
         String txHash = req.getOnchainTx();
-        String buyerWallet = req.getBuyer();
+        String buyer = req.getBuyer();
         String plan = req.getPlan() != null ? req.getPlan().toUpperCase() : "STANDARD"; // 기본값
         Long modelId = req.getId();
 
@@ -73,7 +75,7 @@ public class PaymentService {
         // 2️⃣ 결제 정보 임시 저장 (상태: PENDING)
         Receipt receipt = Receipt.builder()
                 .modelId(modelId)
-                .buyerWallet(buyerWallet)
+                .buyer(buyer)
                 .plan(plan)
                 .amountLamports(amountLamports)
                 .onchainTxHash(txHash)
@@ -85,7 +87,7 @@ public class PaymentService {
         try {
             var result = blockchainService.verifyPurchase(
                     txHash,
-                    buyerWallet,
+                    buyer,
                     amountLamports,
                     plan
             );
@@ -138,5 +140,24 @@ public class PaymentService {
                 .receiptPda(r.getReceiptPda())
                 .status(r.getStatus().name())
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentResponse> getReceiptsByBuyer(String buyer) {
+        List<Receipt> receipts = receiptRepository.findAllByBuyer(buyer);
+
+        if (receipts.isEmpty()) {
+            throw new IllegalArgumentException("해당 구매자의 영수증이 존재하지 않습니다. (buyer=" + buyer + ")");
+        }
+
+        return receipts.stream()
+                .map(r -> PaymentResponse.builder()
+                        .success(r.getStatus() == Receipt.Status.VERIFIED)
+                        .receiptId(r.getId())
+                        .transactionHash(r.getOnchainTxHash())
+                        .receiptPda(r.getReceiptPda())
+                        .status(r.getStatus().name())
+                        .build())
+                .toList();
     }
 }

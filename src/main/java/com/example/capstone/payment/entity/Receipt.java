@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
         uniqueConstraints = @UniqueConstraint(name = "uq_tx", columnNames = "onchain_tx_hash"),
         indexes = {
                 @Index(name = "idx_model", columnList = "model_id"),
-                @Index(name = "idx_buyer", columnList = "buyer_wallet")
+                @Index(name = "idx_buyer", columnList = "buyer")
         })
 @Getter
 @Setter
@@ -33,8 +33,8 @@ public class Receipt {
     @Column(name = "model_id", nullable = false)
     private Long modelId;
 
-    @Column(name = "buyer_wallet", nullable = false, length = 100)
-    private String buyerWallet;
+    @Column(name = "buyer")
+    private String buyer;
 
     @Column(name = "plan", nullable = false, length = 40)
     private String plan; // STANDARD / ENTERPRISE

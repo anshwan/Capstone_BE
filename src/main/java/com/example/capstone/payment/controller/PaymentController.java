@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * 🔹 결제 검증 & 영수증 관리 컨트롤러
  */
@@ -78,7 +80,7 @@ public class PaymentController {
     }
 
     /**
-     * 🔎 영수증 상태 조회 API
+     * 🔎 영수증 상태 조회 (단일 ID)
      */
     @Operation(
             summary = "결제 영수증 상태 조회",
@@ -101,5 +103,31 @@ public class PaymentController {
     ) {
         PaymentResponse response = paymentService.getReceiptStatus(id);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 🔹 특정 buyer(구매자)별 영수증 전체 조회
+     */
+    @Operation(
+            summary = "구매자별 영수증 전체 조회",
+            description = "특정 buyer(구매자)로 결제된 모든 영수증 내역을 조회합니다."
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "영수증 목록 조회 성공",
+            content = @Content(schema = @Schema(implementation = PaymentResponse.class))
+    )
+    @ApiResponse(
+            responseCode = "404",
+            description = "해당 구매자의 영수증을 찾을 수 없음",
+            content = @Content
+    )
+    @GetMapping("/buyer/{buyer}")
+    public ResponseEntity<List<PaymentResponse>> getReceiptsByBuyer(
+            @Parameter(description = "조회할 buyer (구매자)", example = "agentchaintest")
+            @PathVariable String buyer
+    ) {
+        List<PaymentResponse> responses = paymentService.getReceiptsByBuyer(buyer);
+        return ResponseEntity.ok(responses);
     }
 }
