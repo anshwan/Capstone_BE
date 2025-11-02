@@ -35,6 +35,8 @@ dependencies {
 	implementation "me.paulschwarz:spring-dotenv:4.0.0"
 	implementation("org.springframework.boot:spring-boot-starter-webflux")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
+	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+
 
 	// DB Driver (MySQL)
 	runtimeOnly 'com.mysql:mysql-connector-j'

@@ -2,11 +2,12 @@ package com.example.capstone.blockchain.service;
 
 import com.example.capstone.blockchain.dto.BlockchainResponse;
 import com.example.capstone.model.dto.ModelUploadRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 import java.util.UUID;
@@ -16,20 +17,19 @@ import java.util.UUID;
 public class BlockchainService {
 
     private final RestTemplate restTemplate = new RestTemplate();
-    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    /** ✅ LocalDate 직렬화 지원 */
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule());
 
     /**
      * 🔹 모델 등록 요청 (프론트 → 백엔드 → 온체인 서버)
-     * 백엔드에서 받은 ModelUploadRequest 전체를 그대로 블록체인 서버로 전달
      */
     public BlockchainResponse registerOnChain(ModelUploadRequest modelRequest) {
-        // ✅ Postman에서 실제로 확인된 라우트로 교체 필요
         String url = "https://35.216.87.44.sslip.io/api/transactions/register-model";
 
         try {
-            // JSON 직렬화 (요청 바디 확인용)
             String jsonBody = objectMapper.writeValueAsString(modelRequest);
-
             System.out.println("🟢 [registerOnChain] 요청 URL: " + url);
             System.out.println("🟢 [registerOnChain] 요청 바디(JSON): " + jsonBody);
 
@@ -61,7 +61,7 @@ public class BlockchainService {
             e.printStackTrace();
         }
 
-        // ✅ 더미 응답 (온체인 서버 연결 실패 시)
+        // ✅ 더미 응답 반환
         BlockchainResponse dummy = new BlockchainResponse();
         dummy.setPda("dummy_pda_" + UUID.randomUUID());
         dummy.setTxSignature("dummy_tx_" + UUID.randomUUID());
@@ -72,7 +72,7 @@ public class BlockchainService {
     }
 
     /**
-     * 🔹 결제 검증 요청 (transactionSignature만 전송)
+     * 🔹 결제 검증 요청
      */
     public VerifyPurchaseResult verifyPurchase(String txHash) {
         try {
@@ -105,7 +105,7 @@ public class BlockchainService {
         }
     }
 
-    /** 🔹 내부 응답 객체 (PaymentService와 연동용) */
+    /** 🔹 내부 응답 객체 */
     @lombok.Value
     public static class VerifyPurchaseResult {
         boolean success;
