@@ -18,7 +18,7 @@ public class BlockchainService {
     /** 🔹 기존 모델 등록 요청 */
     public BlockchainResponse registerOnChain(BlockchainRequest request) {
         try {
-            String url = "http://localhost:4000/register_model"; // 블록체인 백엔드 API
+            String url = "https://35.216.87.44.sslip.io/api/transactions/register-model"; // 블록체인 백엔드 API
             return restTemplate.postForObject(url, request, BlockchainResponse.class);
         } catch (Exception e) {
             System.err.println("⚠️ Blockchain 연동 실패: " + e.getMessage());
@@ -39,7 +39,7 @@ public class BlockchainService {
                                                String plan) {
         try {
             // 블록체인 백엔드 결제 검증 API
-            String url = "http://localhost:4000/verify_purchase";
+            String url = "https://35.216.87.44.sslip.io/api/transactions/process-signature-royalty";
 
             Map<String, Object> body = Map.of(
                     "txHash", txHash,
