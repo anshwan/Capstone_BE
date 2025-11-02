@@ -1,4 +1,3 @@
-// src/main/java/com/example/capstone/payment/service/PaymentService.java
 package com.example.capstone.payment.service;
 
 import com.example.capstone.blockchain.service.BlockchainService;
@@ -19,26 +18,12 @@ public class PaymentService {
     private final ReceiptRepository receiptRepository;
     private final BlockchainService blockchainService;
 
-    /**
-     * 🔹 결제 검증 + 영수증 생성
-     * 프론트 요청 예시:
-     * {
-     *   "id": 1,
-     *   "buyer": "안승환",
-     *   "plan": "standard",   // ✅ 추가: 사용자가 선택한 플랜
-     *   "pricing": {
-     *     "research": { "price": 5, "description": "연구용", "billingType": "free" },
-     *     "standard": { "price": 20, "description": "표준", "billingType": "monthly_subscription" },
-     *     "enterprise": { "price": 100, "description": "기업용", "billingType": "one_time_purchase" }
-     *   },
-     *   "onchainTx": "0x1a2b3c4d..."
-     * }
-     */
+    /** 🔹 결제 검증 + 영수증 생성 */
     @Transactional
     public PaymentResponse verifyAndCreateReceipt(PaymentRequest req) {
         String txHash = req.getOnchainTx();
         String buyer = req.getBuyer();
-        String plan = req.getPlan() != null ? req.getPlan().toUpperCase() : "STANDARD"; // 기본값
+        String plan = req.getPlan() != null ? req.getPlan().toUpperCase() : "STANDARD";
         Long modelId = req.getId();
 
         // ✅ 선택된 플랜의 결제 금액 추출
@@ -83,23 +68,18 @@ public class PaymentService {
                 .build();
         receiptRepository.saveAndFlush(receipt);
 
-        // 3️⃣ 온체인 검증 요청
+        // 3️⃣ 온체인 검증 요청 (transactionSignature만 전송)
         try {
-            var result = blockchainService.verifyPurchase(
-                    txHash,
-                    buyer,
-                    amountLamports,
-                    plan
-            );
+            var result = blockchainService.verifyPurchase(txHash);
 
             if (result.isSuccess()) {
-                // ✅ 검증 성공
                 receipt.setStatus(Receipt.Status.VERIFIED);
-                receipt.setReceiptPda(result.getSubscriptionReceiptPDA());
+                receipt.setReceiptPda(result.getReceiptPda()); // ✅ 이름 수정됨
+                receiptRepository.save(receipt); // ✅ 상태 반영
                 System.out.println("✅ 결제 검증 성공: txHash=" + result.getTransactionHash());
             } else {
-                // ❌ 블록체인 서버 응답 실패
                 receipt.setStatus(Receipt.Status.FAILED);
+                receiptRepository.save(receipt); // ✅ 상태 반영
                 System.err.println("❌ 결제 검증 실패: txHash=" + txHash);
             }
 
@@ -112,8 +92,8 @@ public class PaymentService {
                     .build();
 
         } catch (Exception e) {
-            // ⚠️ 통신 예외 발생 시 FAILED 처리
             receipt.setStatus(Receipt.Status.FAILED);
+            receiptRepository.save(receipt); // ✅ 예외 시에도 저장
             System.err.println("⚠️ 블록체인 검증 예외 발생: " + e.getMessage());
 
             return PaymentResponse.builder()
@@ -125,9 +105,7 @@ public class PaymentService {
         }
     }
 
-    /**
-     * 🔹 영수증 상태 조회
-     */
+    /** 🔹 영수증 상태 조회 */
     @Transactional(readOnly = true)
     public PaymentResponse getReceiptStatus(Long id) {
         Receipt r = receiptRepository.findById(id)
@@ -142,6 +120,7 @@ public class PaymentService {
                 .build();
     }
 
+    /** 🔹 구매자별 영수증 전체 조회 */
     @Transactional(readOnly = true)
     public List<PaymentResponse> getReceiptsByBuyer(String buyer) {
         List<Receipt> receipts = receiptRepository.findAllByBuyer(buyer);

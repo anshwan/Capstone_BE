@@ -32,23 +32,17 @@ public class BlockchainService {
         }
     }
 
-    /** 🔹 새로 추가: 결제 검증 요청 */
-    public VerifyPurchaseResult verifyPurchase(String txHash,
-                                               String buyerWallet,
-                                               long amountLamports,
-                                               String plan) {
+    /** 🔹 수정됨: 결제 검증 요청 (transactionSignature만 전송) */
+    public VerifyPurchaseResult verifyPurchase(String txHash) {
         try {
-            // 블록체인 백엔드 결제 검증 API
             String url = "https://35.216.87.44.sslip.io/api/transactions/process-signature-royalty";
 
+            // ✅ 온체인 백엔드에서 요구하는 필드명으로 맞춤
             Map<String, Object> body = Map.of(
-                    "txHash", txHash,
-                    "buyerWallet", buyerWallet,
-                    "amountLamports", amountLamports,
-                    "plan", plan
+                    "transactionSignature", txHash
             );
 
-            // 응답은 예: {"success":true,"transactionHash":"...","subscriptionReceiptPDA":"..."}
+            // 응답 예시: {"success":true,"transactionHash":"...","subscriptionReceiptPDA":"..."}
             Map<?, ?> response = restTemplate.postForObject(url, body, Map.class);
 
             boolean success = Boolean.TRUE.equals(response.get("success"));
@@ -68,6 +62,6 @@ public class BlockchainService {
     public static class VerifyPurchaseResult {
         boolean success;
         String transactionHash;
-        String subscriptionReceiptPDA;
+        String receiptPda; // ✅ 수정됨 — 기존 subscriptionReceiptPDA → receiptPda
     }
 }
