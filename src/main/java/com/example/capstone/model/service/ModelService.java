@@ -1,7 +1,6 @@
 package com.example.capstone.model.service;
 
 import com.example.capstone.blockchain.client.BlockchainClient;
-import com.example.capstone.blockchain.dto.BlockchainRequest;
 import com.example.capstone.blockchain.dto.BlockchainResponse;
 import com.example.capstone.blockchain.service.BlockchainService;
 import com.example.capstone.model.dto.ModelDetailResponse;
@@ -115,10 +114,7 @@ public class ModelService {
         }
 
         Map<String, Object> pricingMap = buildPricingMap(model);
-
-        // ✅ 단일 부모 계보 전체 추적 (출력용 가상 step 기반)
         List<Map<String, Object>> lineageList = buildFullLineage(model.getName());
-
         List<String> releaseNotesList = model.getReleaseNotes().stream()
                 .map(ReleaseNote::getNote)
                 .toList();
@@ -146,11 +142,10 @@ public class ModelService {
                 .build();
     }
 
-    /** ✅ 출력용 가상 step 기반 계보 (최상위 부모 = step1 → 현재 모델까지 순서대로) */
+    /** ✅ 계보 생성 */
     private List<Map<String, Object>> buildFullLineage(String currentModelName) {
         List<Map<String, Object>> lineageChain = new ArrayList<>();
 
-        // 재귀적으로 부모 → 조부모까지 탐색
         lineageRepository.findByToModel(currentModelName).ifPresent(lineage -> {
             if (lineage.getFromModel() != null) {
                 lineageChain.addAll(buildFullLineage(lineage.getFromModel()));
@@ -163,11 +158,9 @@ public class ModelService {
             lineageChain.add(map);
         });
 
-        // 출력용 가상 step 부여 (1부터 순차)
         for (int i = 0; i < lineageChain.size(); i++) {
             lineageChain.get(i).put("step", i + 1);
         }
-
         return lineageChain;
     }
 
@@ -267,33 +260,16 @@ public class ModelService {
                 .toList();
     }
 
+    /** ✅ 모델 업로드 */
     @Transactional
     public Long uploadModel(ModelUploadRequest req) {
-        // ⚙️ Lady T의 기존 코드 그대로 유지
-        String parentModelId = req.getLineage() != null ? req.getLineage().getParentModelId() : null;
-        String relationship = req.getLineage() != null ? req.getLineage().getRelationship() : null;
-
-        String parentModelPda = null;
-        if (parentModelId != null) {
-            parentModelPda = modelRepository.findById(Long.valueOf(parentModelId))
-                    .map(Model::getPda).orElse(null);
-        }
-
-        BlockchainRequest chainReq = BlockchainRequest.builder()
-                .developerWallet(req.getWalletAddress())
-                .developerSignature(req.getDeveloperSignature())
-                .modelName(req.getName())
-                .ipfsCid(req.getCidRoot())
-                .priceLamports("100000000")
-                .royaltyBps(250)
-                .parentModelPda(parentModelPda)
-                .build();
-
         System.out.println("🟣 [uploadModel] registerOnChain() 호출 시작");
-        BlockchainResponse chainRes = blockchainService.registerOnChain(chainReq);
+
+        // 온체인 등록 요청 — 전체 모델 정보 전달
+        BlockchainResponse chainRes = blockchainService.registerOnChain(req);
+
         System.out.println("🟣 [uploadModel] registerOnChain() 호출 완료 — 응답: " + chainRes);
 
-        // 응답 결과 요약
         if (chainRes != null) {
             System.out.println("✅ [uploadModel] 온체인 등록 성공 또는 더미 응답 수신");
             System.out.println("   ├─ PDA: " + chainRes.getPda());
@@ -320,12 +296,16 @@ public class ModelService {
                 .thumbnail(req.getThumbnail())
                 .cidRoot(req.getCidRoot())
                 .encryptionKey(req.getEncryptionKey())
-                .pda(chainRes.getPda())
-                .onchainTx(chainRes.getTxSignature())
+                .pda(chainRes != null ? chainRes.getPda() : null)
+                .onchainTx(chainRes != null ? chainRes.getTxSignature() : null)
                 .build();
         modelRepository.saveAndFlush(model);
 
-        if (parentModelId != null || relationship != null) {
+        // 계보 처리
+        if (req.getLineage() != null && req.getLineage().getParentModelId() != null) {
+            String parentModelId = req.getLineage().getParentModelId();
+            String relationship = req.getLineage().getRelationship();
+
             String fromModel = modelRepository.findById(Long.valueOf(parentModelId))
                     .map(Model::getName).orElse(null);
 
@@ -348,6 +328,7 @@ public class ModelService {
                     .build());
         }
 
+        // 릴리즈 노트
         if (req.getReleaseNotes() != null) {
             releaseNoteRepository.save(ReleaseNote.builder()
                     .model(model)
@@ -355,6 +336,7 @@ public class ModelService {
                     .build());
         }
 
+        // 가격 플랜 저장
         if (req.getPricing() != null) {
             for (Map.Entry<String, Object> entry : req.getPricing().entrySet()) {
                 Map<String, Object> plan = (Map<String, Object>) entry.getValue();
@@ -372,7 +354,7 @@ public class ModelService {
             }
         }
 
-        // ✅ metrics 저장
+        // metrics 저장
         switch (req.getModality().trim().toLowerCase()) {
             case "llm" -> llmSpecsRepository.save(LlmSpecs.of(
                     model,
