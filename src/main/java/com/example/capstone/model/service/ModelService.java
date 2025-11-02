@@ -289,7 +289,18 @@ public class ModelService {
                 .parentModelPda(parentModelPda)
                 .build();
 
+        System.out.println("🟣 [uploadModel] registerOnChain() 호출 시작");
         BlockchainResponse chainRes = blockchainService.registerOnChain(chainReq);
+        System.out.println("🟣 [uploadModel] registerOnChain() 호출 완료 — 응답: " + chainRes);
+
+        // 응답 결과 요약
+        if (chainRes != null) {
+            System.out.println("✅ [uploadModel] 온체인 등록 성공 또는 더미 응답 수신");
+            System.out.println("   ├─ PDA: " + chainRes.getPda());
+            System.out.println("   └─ TxSignature: " + chainRes.getTxSignature());
+        } else {
+            System.err.println("❌ [uploadModel] 온체인 등록 실패 — BlockchainResponse가 null 입니다");
+        }
 
         String licenseJson = "[]";
         try {
