@@ -49,10 +49,15 @@ public class BlockchainService {
             String transactionHash = (String) response.get("transactionHash");
             String receiptPda = (String) response.get("subscriptionReceiptPDA");
 
+            System.out.println("🟢 요청 바디: " + body);
+            System.out.println("🟢 요청 URL: " + url);
+            System.out.println("🟢 응답 원본: " + response);
+
             return new VerifyPurchaseResult(success, transactionHash, receiptPda);
 
         } catch (Exception e) {
-            System.err.println("⚠️ 결제 검증 실패: " + e.getMessage());
+            e.printStackTrace(); // 전체 스택트레이스 출력
+            System.err.println("⚠️ 결제 검증 실패: " + e);
             return new VerifyPurchaseResult(false, "dummy_tx_" + UUID.randomUUID(), null);
         }
     }
