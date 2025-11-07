@@ -2,6 +2,8 @@ package com.example.capstone.blockchain.service;
 
 import com.example.capstone.blockchain.dto.BlockchainResponse;
 import com.example.capstone.model.dto.ModelUploadRequest;
+import com.example.capstone.model.entity.Model;
+import com.example.capstone.model.repository.ModelRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +11,7 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -18,24 +21,55 @@ public class BlockchainService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
+    private final ModelRepository modelRepository; // ✅ DB 조회 위해 추가
+
     /** ✅ LocalDate 직렬화 지원 */
     private final ObjectMapper objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule());
 
     /**
-     * 🔹 모델 등록 요청 (프론트 → 백엔드 → 온체인 서버)
+     * ✅ 모델 등록 요청 (프론트 → 백엔드 → 온체인 서버)
      */
-    public BlockchainResponse registerOnChain(ModelUploadRequest modelRequest) {
+    public BlockchainResponse registerOnChain(ModelUploadRequest req) {
         String url = "https://35.216.87.44.sslip.io/api/transactions/register-model";
 
         try {
-            String jsonBody = objectMapper.writeValueAsString(modelRequest);
-            System.out.println("🟢 [registerOnChain] 요청 URL: " + url);
-            System.out.println("🟢 [registerOnChain] 요청 바디(JSON): " + jsonBody);
+            Map<String, Object> body = new LinkedHashMap<>();
+
+            // ✅ 공통 필드 매핑
+            body.put("name", req.getName());
+            body.put("uploader", req.getUploader());
+            body.put("versionName", req.getVersionName());
+            body.put("modality", req.getModality());
+            body.put("license", req.getLicense());
+            body.put("walletAddress", req.getWalletAddress());
+            body.put("releaseDate", req.getReleaseDate());
+            body.put("overview", req.getOverview());
+            body.put("releaseNotes", req.getReleaseNotes());
+            body.put("thumbnail", req.getThumbnail());
+            body.put("cidRoot", req.getCidRoot());
+            body.put("encryptionKey", req.getEncryptionKey());
+            body.put("pricing", req.getPricing());
+            body.put("metrics", req.getMetrics());
+            body.put("technicalSpecs", req.getTechnicalSpecs());
+            body.put("sample", req.getSample());
+
+            // ✅ lineage → parentModelPDA 변환 반영
+            if (req.getLineage() != null && req.getLineage().getParentModelId() != null) {
+                Long parentId = Long.valueOf(req.getLineage().getParentModelId());
+                Model parentModel = modelRepository.findById(parentId).orElse(null);
+
+                if (parentModel != null && parentModel.getPda() != null) {
+                    body.put("parentModelPDA", parentModel.getPda());
+                    body.put("relationship", req.getLineage().getRelationship());
+                }
+            }
+
+            String jsonBody = objectMapper.writeValueAsString(body);
+            System.out.println("🟢 [registerOnChain] 전송 JSON: " + jsonBody);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-
             HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
 
             ResponseEntity<BlockchainResponse> response = restTemplate.exchange(
@@ -46,28 +80,18 @@ public class BlockchainService {
             );
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                BlockchainResponse body = response.getBody();
-                System.out.println("✅ [registerOnChain] 온체인 등록 성공");
-                System.out.println("   ├─ status: " + body.getStatus());
-                System.out.println("   ├─ pda: " + body.getPda());
-                System.out.println("   └─ txSignature: " + body.getTxSignature());
-                return body;
-            } else {
-                System.err.println("⚠️ [registerOnChain] 온체인 서버 응답 비정상: " + response.getStatusCode());
+                return response.getBody();
             }
 
         } catch (Exception e) {
-            System.err.println("❌ [registerOnChain] 블록체인 연동 실패: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("❌ [registerOnChain] 실패: " + e.getMessage());
         }
 
-        // ✅ 더미 응답 반환
+        // ✅ 더미 응답 (온체인 서버 장애 대비)
         BlockchainResponse dummy = new BlockchainResponse();
         dummy.setPda("dummy_pda_" + UUID.randomUUID());
         dummy.setTxSignature("dummy_tx_" + UUID.randomUUID());
         dummy.setStatus("DUMMY_SUCCESS");
-        System.out.println("⚠️ [registerOnChain] 더미 응답 반환: " + dummy);
-
         return dummy;
     }
 
@@ -80,27 +104,15 @@ public class BlockchainService {
 
             Map<String, Object> body = Map.of("transactionSignature", txHash);
 
-            System.out.println("🟢 [verifyPurchase] 요청 URL: " + url);
-            System.out.println("🟢 [verifyPurchase] 요청 바디: " + body);
-
             Map<?, ?> response = restTemplate.postForObject(url, body, Map.class);
-            System.out.println("🟢 [verifyPurchase] 응답 원본: " + response);
 
             boolean success = Boolean.TRUE.equals(response.get("success"));
             String transactionHash = (String) response.get("transactionHash");
             String receiptPda = (String) response.get("subscriptionReceiptPDA");
 
-            if (success) {
-                System.out.println("✅ [verifyPurchase] 결제 검증 성공: " + transactionHash);
-            } else {
-                System.err.println("❌ [verifyPurchase] 결제 검증 실패: " + response);
-            }
-
             return new VerifyPurchaseResult(success, transactionHash, receiptPda);
 
         } catch (Exception e) {
-            e.printStackTrace();
-            System.err.println("⚠️ [verifyPurchase] 예외 발생: " + e);
             return new VerifyPurchaseResult(false, "dummy_tx_" + UUID.randomUUID(), null);
         }
     }
