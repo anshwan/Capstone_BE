@@ -76,6 +76,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         return path.equals("/api/models")   // 공개 모델 조회 API
                 || path.startsWith("/api/models")
+                || path.startsWith("/api/payments")
                 || path.startsWith("/swagger-ui")
                 || path.startsWith("/v3/api-docs")
                 || path.startsWith("/health")
