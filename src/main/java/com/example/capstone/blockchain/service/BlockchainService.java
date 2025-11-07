@@ -100,7 +100,7 @@ public class BlockchainService {
      */
     public VerifyPurchaseResult verifyPurchase(String txHash) {
         try {
-            String url = "https://35.216.87.44.sslip.io/api/transactions/process-signature-royalty";
+            String url = "https://35.216.87.44.sslip.io/api/signature-royalty/process-signature-royalty";
 
             Map<String, Object> body = Map.of("transactionSignature", txHash);
 
