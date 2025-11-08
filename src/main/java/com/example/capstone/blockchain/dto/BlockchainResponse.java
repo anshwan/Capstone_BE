@@ -6,11 +6,15 @@ import lombok.Data;
 @Data
 public class BlockchainResponse {
 
-    @JsonProperty("pda")
-    private String pda;
+    @JsonProperty("transactionHash")
+    private String txSignature; // ✅ 기존 onchainTx 에 쓰던 값
 
-    @JsonProperty("transactionSignature") // ✅ 서버 필드와 매핑
-    private String txSignature;           // ✅ 기존 코드 사용 가능
+    @JsonProperty("data")
+    private DataField data; // ✅ 내부 data 객체 매핑
 
-    private String status; // 서버에서 주면 매핑됨, 없어도 null 가능
+    @Data
+    public static class DataField {
+        @JsonProperty("modelAccountPDA")
+        private String pda; // ✅ 모델 PDA
+    }
 }

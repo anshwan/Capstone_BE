@@ -270,34 +270,28 @@ public class ModelService {
 
         System.out.println("🟣 [uploadModel] registerOnChain() 호출 완료 — 응답: " + chainRes);
 
-        if (chainRes != null) {
-            System.out.println("✅ [uploadModel] 온체인 등록 성공 또는 더미 응답 수신");
-            System.out.println("   ├─ PDA: " + chainRes.getPda());
-            System.out.println("   └─ TxSignature: " + chainRes.getTxSignature());
-        } else {
-            System.err.println("❌ [uploadModel] 온체인 등록 실패 — BlockchainResponse가 null 입니다");
-        }
+        // ✅ 변경 포인트
+        String pda = (chainRes != null && chainRes.getData() != null)
+                ? chainRes.getData().getPda()
+                : null;
 
-        String licenseJson = "[]";
-        try {
-            if (req.getLicense() != null && !req.getLicense().isEmpty()) {
-                licenseJson = objectMapper.writeValueAsString(req.getLicense());
-            }
-        } catch (Exception ignored) {}
+        String txSignature = (chainRes != null)
+                ? chainRes.getTxSignature()
+                : null;
 
         Model model = Model.builder()
                 .name(req.getName())
                 .uploader(req.getUploader() != null ? req.getUploader() : req.getWalletAddress())
                 .versionName(req.getVersionName())
                 .modality(Modality.valueOf(req.getModality().trim().toUpperCase()))
-                .license(licenseJson)
+                .license(writeJson(req.getLicense()))
                 .overview(req.getOverview())
                 .releaseDate(req.getReleaseDate())
                 .thumbnail(req.getThumbnail())
                 .cidRoot(req.getCidRoot())
                 .encryptionKey(req.getEncryptionKey())
-                .pda(chainRes != null ? chainRes.getPda() : null)
-                .onchainTx(chainRes != null ? chainRes.getTxSignature() : null)
+                .pda(pda)                  // ✅ 수정됨
+                .onchainTx(txSignature)    // ✅ 수정됨
                 .build();
         modelRepository.saveAndFlush(model);
 
