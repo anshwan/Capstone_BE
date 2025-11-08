@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -405,24 +406,25 @@ public class ModelService {
         Model model = modelRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("모델을 찾을 수 없습니다. id=" + id));
 
-        // Specs 삭제
-        llmSpecsRepository.deleteById(id);
-        imageSpecsRepository.deleteById(id);
-        audioSpecsRepository.deleteById(id);
-        multimodalSpecsRepository.deleteById(id);
+        // 🔥 Specs 삭제 (PK 아니고 model 연관관계로 삭제해야 함)
+        llmSpecsRepository.deleteByModel(model);
+        imageSpecsRepository.deleteByModel(model);
+        audioSpecsRepository.deleteByModel(model);
+        multimodalSpecsRepository.deleteByModel(model);
 
-        // Pricing 삭제
+        // 💳 Pricing 삭제
         pricingPlanRepository.deleteAllByModel(model);
 
-        // Release Notes 삭제
+        // 📝 Release Notes 삭제
         releaseNoteRepository.deleteAllByModel(model);
 
-        // Lineage 삭제
+        // 🧬 Lineage (양방향)
         lineageRepository.deleteAllByModel(model);
 
-        // 마지막으로 Model 삭제
+        // 🗑 Model 삭제 (마지막)
         modelRepository.delete(model);
     }
+
 
 
 
