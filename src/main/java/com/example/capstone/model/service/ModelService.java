@@ -400,6 +400,32 @@ public class ModelService {
         return model.getId();
     }
 
+    @Transactional
+    public void deleteModel(Long id) {
+        Model model = modelRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("모델을 찾을 수 없습니다. id=" + id));
+
+        // Specs 삭제
+        llmSpecsRepository.deleteById(id);
+        imageSpecsRepository.deleteById(id);
+        audioSpecsRepository.deleteById(id);
+        multimodalSpecsRepository.deleteById(id);
+
+        // Pricing 삭제
+        pricingPlanRepository.deleteAllByModel(model);
+
+        // Release Notes 삭제
+        releaseNoteRepository.deleteAllByModel(model);
+
+        // Lineage 삭제
+        lineageRepository.deleteAllByModel(model);
+
+        // 마지막으로 Model 삭제
+        modelRepository.delete(model);
+    }
+
+
+
     private Object getMetricValue(Map<String, Object> map, String key) {
         if (map == null || key == null) return null;
         for (String k : map.keySet()) {

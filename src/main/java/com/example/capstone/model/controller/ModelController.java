@@ -47,4 +47,12 @@ public class ModelController {
         Long id = modelService.uploadModel(request);
         return ResponseEntity.ok(id);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteModel(@PathVariable Long id) {
+        modelService.deleteModel(id);
+        return ResponseEntity.ok("Model deleted successfully.");
+    }
+
+
 }
