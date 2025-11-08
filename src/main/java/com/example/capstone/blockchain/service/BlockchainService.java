@@ -20,30 +20,31 @@ import java.util.UUID;
 public class BlockchainService {
 
     private final RestTemplate restTemplate = new RestTemplate();
+    private final ModelRepository modelRepository;
 
-    private final ModelRepository modelRepository; // ✅ DB 조회 위해 추가
-
-    /** ✅ LocalDate 직렬화 지원 */
+    /** ✅ LocalDate → yyyy-MM-dd 문자열 직렬화 */
     private final ObjectMapper objectMapper = new ObjectMapper()
-            .registerModule(new JavaTimeModule());
+            .registerModule(new JavaTimeModule())
+            .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     /**
-     * ✅ 모델 등록 요청 (프론트 → 백엔드 → 온체인 서버)
+     * ✅ 모델 등록 → 온체인 서버 호출
      */
     public BlockchainResponse registerOnChain(ModelUploadRequest req) {
+
         String url = "https://35.216.87.44.sslip.io/api/transactions/register-model";
 
         try {
             Map<String, Object> body = new LinkedHashMap<>();
 
-            // ✅ 공통 필드 매핑
+            // ✅ 공통 필드
             body.put("name", req.getName());
             body.put("uploader", req.getUploader());
             body.put("versionName", req.getVersionName());
             body.put("modality", req.getModality());
-            body.put("license", req.getLicense());
+            body.put("license", req.getLicense()); // 배열 그대로 전달
             body.put("walletAddress", req.getWalletAddress());
-            body.put("releaseDate", req.getReleaseDate());
+            body.put("releaseDate", req.getReleaseDate().toString()); // ✅ 날짜 문자열화
             body.put("overview", req.getOverview());
             body.put("releaseNotes", req.getReleaseNotes());
             body.put("thumbnail", req.getThumbnail());
@@ -52,9 +53,30 @@ public class BlockchainService {
             body.put("pricing", req.getPricing());
             body.put("metrics", req.getMetrics());
             body.put("technicalSpecs", req.getTechnicalSpecs());
-            body.put("sample", req.getSample());
 
-            // ✅ lineage → parentModelPDA 변환 반영
+            // ✅ sample → input/output 변환
+            Map<String, Object> fixedSample = new LinkedHashMap<>();
+            switch (req.getModality().trim().toLowerCase()) {
+                case "llm" -> {
+                    fixedSample.put("input", req.getSample().get("sample_prompt"));
+                    fixedSample.put("output", req.getSample().get("sample_output"));
+                }
+                case "image", "image_generation" -> {
+                    fixedSample.put("input", req.getSample().get("sample_prompt"));
+                    fixedSample.put("output", req.getSample().get("sample_output_image"));
+                }
+                case "audio" -> {
+                    fixedSample.put("input", req.getSample().get("sample_input_audio"));
+                    fixedSample.put("output", req.getSample().get("sample_output"));
+                }
+                case "multimodal" -> {
+                    fixedSample.put("input", req.getSample().get("sample_input_image"));
+                    fixedSample.put("output", req.getSample().get("sample_output"));
+                }
+            }
+            body.put("sample", fixedSample);
+
+            // ✅ lineage → parentModelPDA 변환
             if (req.getLineage() != null && req.getLineage().getParentModelId() != null) {
                 Long parentId = Long.valueOf(req.getLineage().getParentModelId());
                 Model parentModel = modelRepository.findById(parentId).orElse(null);
@@ -66,7 +88,7 @@ public class BlockchainService {
             }
 
             String jsonBody = objectMapper.writeValueAsString(body);
-            System.out.println("🟢 [registerOnChain] 전송 JSON: " + jsonBody);
+            System.out.println("🟢 [registerOnChain] 전송 JSON → " + jsonBody);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -80,6 +102,7 @@ public class BlockchainService {
             );
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                System.out.println("✅ [registerOnChain] 온체인 성공: " + response.getBody());
                 return response.getBody();
             }
 
@@ -87,7 +110,7 @@ public class BlockchainService {
             System.err.println("❌ [registerOnChain] 실패: " + e.getMessage());
         }
 
-        // ✅ 더미 응답 (온체인 서버 장애 대비)
+        // ✅ 장애 대비 dummy (개발시 정상)
         BlockchainResponse dummy = new BlockchainResponse();
         dummy.setPda("dummy_pda_" + UUID.randomUUID());
         dummy.setTxSignature("dummy_tx_" + UUID.randomUUID());
@@ -98,7 +121,7 @@ public class BlockchainService {
     /**
      * 🔹 결제 검증 요청
      */
-    public VerifyPurchaseResult verifyPurchase(String txHash) {
+    public BlockchainService.VerifyPurchaseResult verifyPurchase(String txHash) {
         try {
             String url = "https://35.216.87.44.sslip.io/api/signature-royalty/process-signature-royalty";
 
@@ -110,10 +133,10 @@ public class BlockchainService {
             String transactionHash = (String) response.get("transactionHash");
             String receiptPda = (String) response.get("subscriptionReceiptPDA");
 
-            return new VerifyPurchaseResult(success, transactionHash, receiptPda);
+            return new BlockchainService.VerifyPurchaseResult(success, transactionHash, receiptPda);
 
         } catch (Exception e) {
-            return new VerifyPurchaseResult(false, "dummy_tx_" + UUID.randomUUID(), null);
+            return new BlockchainService.VerifyPurchaseResult(false, "dummy_tx_" + UUID.randomUUID(), null);
         }
     }
 
@@ -125,3 +148,4 @@ public class BlockchainService {
         String receiptPda;
     }
 }
+
