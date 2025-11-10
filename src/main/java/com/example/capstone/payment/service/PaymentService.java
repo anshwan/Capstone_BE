@@ -1,6 +1,8 @@
 package com.example.capstone.payment.service;
 
 import com.example.capstone.blockchain.service.BlockchainService;
+import com.example.capstone.model.entity.Model;
+import com.example.capstone.model.repository.ModelRepository;
 import com.example.capstone.payment.dto.PaymentRequest;
 import com.example.capstone.payment.dto.PaymentResponse;
 import com.example.capstone.payment.entity.Receipt;
@@ -17,6 +19,7 @@ public class PaymentService {
 
     private final ReceiptRepository receiptRepository;
     private final BlockchainService blockchainService;
+    private final ModelRepository modelRepository; // ✅ 추가
 
     /** 🔹 결제 검증 + 영수증 생성 */
     @Transactional
@@ -57,7 +60,16 @@ public class PaymentService {
                     throw new IllegalArgumentException("이미 처리된 트랜잭션입니다. (txHash: " + txHash + ")");
                 });
 
-        // 2️⃣ 결제 정보 임시 저장 (상태: PENDING)
+        // ✅ model PDA 조회 (온체인 결제 검증 시 필요)
+        Model model = modelRepository.findById(modelId)
+                .orElseThrow(() -> new IllegalArgumentException("모델을 찾을 수 없습니다. (id=" + modelId + ")"));
+
+        if (model.getPda() == null) {
+            throw new IllegalArgumentException("해당 모델은 온체인에 등록되어 있지 않습니다. (modelPDA 없음)");
+        }
+        String modelPda = model.getPda();
+
+        // 2️⃣ 결제 정보 임시 저장 (PENDING)
         Receipt receipt = Receipt.builder()
                 .modelId(modelId)
                 .buyer(buyer)
@@ -68,19 +80,19 @@ public class PaymentService {
                 .build();
         receiptRepository.saveAndFlush(receipt);
 
-        // 3️⃣ 온체인 검증 요청 (transactionSignature만 전송)
+        // 3️⃣ 온체인 검증 요청 (transactionSignature + modelPDA)
         try {
-            var result = blockchainService.verifyPurchase(txHash);
+            var result = blockchainService.verifyPurchase(txHash, modelPda); // ✅ 변경됨
 
             if (result.isSuccess()) {
                 receipt.setStatus(Receipt.Status.VERIFIED);
-                receipt.setReceiptPda(result.getReceiptPda()); // ✅ 이름 수정됨
-                receiptRepository.save(receipt); // ✅ 상태 반영
+                receipt.setReceiptPda(result.getReceiptPda());
+                receiptRepository.save(receipt);
                 System.out.println("✅ 결제 검증 성공: txHash=" + result.getTransactionHash());
             } else {
                 receipt.setStatus(Receipt.Status.FAILED);
-                receiptRepository.save(receipt); // ✅ 상태 반영
-                System.err.println("❌ 결제 검증 실패: txHash=" + txHash);
+                receiptRepository.save(receipt);
+                System.err.println("❌ 결제 검증 실패: reason=" + result.getReason() + ", message=" + result.getMessage());
             }
 
             return PaymentResponse.builder()
@@ -93,8 +105,8 @@ public class PaymentService {
 
         } catch (Exception e) {
             receipt.setStatus(Receipt.Status.FAILED);
-            receiptRepository.save(receipt); // ✅ 예외 시에도 저장
-            System.err.println("⚠️ 블록체인 검증 예외 발생: " + e.getMessage());
+            receiptRepository.save(receipt);
+            System.err.println("⚠️ 블록체인 검증 중 예외 발생: " + e.getMessage());
 
             return PaymentResponse.builder()
                     .success(false)

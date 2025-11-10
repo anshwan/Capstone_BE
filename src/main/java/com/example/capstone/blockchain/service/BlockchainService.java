@@ -112,32 +112,43 @@ public class BlockchainService {
 
         // ✅ 장애 대비 Dummy 응답 (개발 환경 안전 모드)
         BlockchainResponse dummy = new BlockchainResponse();
-        dummy.setTxSignature("dummy_tx_" + UUID.randomUUID()); // transactionHash 위치
+        dummy.setTxSignature("dummy_tx_" + UUID.randomUUID());
 
         BlockchainResponse.DataField data = new BlockchainResponse.DataField();
-        data.setPda("dummy_pda_" + UUID.randomUUID()); // modelAccountPDA 위치
+        data.setPda("dummy_pda_" + UUID.randomUUID());
         dummy.setData(data);
 
         return dummy;
     }
 
     /**
-     * ✅ 결제 검증 (Tx 로열티 분배)
+     * ✅ 결제 검증 (Tx + modelPDA 기반 로열티 분배)
      */
-    public VerifyPurchaseResult verifyPurchase(String txHash) {
+    public VerifyPurchaseResult verifyPurchase(String txHash, String modelPda) {
         try {
             String url = "https://35.216.87.44.sslip.io/api/signature-royalty/process-signature-royalty";
-            Map<String, Object> body = Map.of("transactionSignature", txHash);
+
+            Map<String, Object> body = Map.of(
+                    "transactionSignature", txHash,
+                    "modelPDA", modelPda
+            );
 
             Map<?, ?> response = restTemplate.postForObject(url, body, Map.class);
-            boolean success = Boolean.TRUE.equals(response.get("success"));
-            String transactionHash = (String) response.get("transactionHash");
-            String receiptPda = (String) response.get("subscriptionReceiptPDA");
 
-            return new VerifyPurchaseResult(success, transactionHash, receiptPda);
+            boolean success = Boolean.TRUE.equals(response.get("success"));
+            String message = (String) response.get("message");
+
+            Map<?, ?> data = (Map<?, ?>) response.get("data");
+
+            String transactionHash = data != null ? String.valueOf(data.get("transactionHash")) : null;
+            String reason = data != null ? String.valueOf(data.get("reason")) : null;
+            String receiptPda = data != null ? String.valueOf(data.get("subscriptionReceiptPDA")) : null;
+
+            return new VerifyPurchaseResult(success, transactionHash, receiptPda, reason, message);
 
         } catch (Exception e) {
-            return new VerifyPurchaseResult(false, "dummy_tx_" + UUID.randomUUID(), null);
+            System.err.println("⚠️ [verifyPurchase] RPC 또는 온체인 서버 오류: " + e.getMessage());
+            return new VerifyPurchaseResult(false, txHash, null, "NETWORK_ERROR", e.getMessage());
         }
     }
 
@@ -147,5 +158,7 @@ public class BlockchainService {
         boolean success;
         String transactionHash;
         String receiptPda;
+        String reason;   // ✅ 실패 원인
+        String message;  // ✅ 에러/설명 메시지
     }
 }
