@@ -135,6 +135,14 @@ public class BlockchainService {
 
             Map<?, ?> response = restTemplate.postForObject(url, body, Map.class);
 
+            // ✅ 여기 추가 → 온체인 백엔드 응답 전체를 그대로 로그 출력
+            try {
+                String rawJson = objectMapper.writeValueAsString(response);
+                System.out.println("🟡 [verifyPurchase] 온체인 응답 RAW → " + rawJson);
+            } catch (Exception e) {
+                System.err.println("⚠️ RAW JSON 로그 변환 실패: " + e.getMessage());
+            }
+
             boolean success = Boolean.TRUE.equals(response.get("success"));
             String message = (String) response.get("message");
 
